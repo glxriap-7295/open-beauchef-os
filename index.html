@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Open Beauchef OS — Decantopia</title>
+
+    <!-- PWA (preparado para instalación en una iteración futura) -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#2E75B6" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Open Beauchef" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+
+    <!-- Tailwind via Play CDN (sin paso de build extra para el MVP) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              brand: {
+                DEFAULT: '#2E75B6',
+                light: '#5B9BD5',
+                dark: '#1F4E79',
+                50: '#EAF2FA',
+                100: '#D6E6F4',
+              },
+              premium: {
+                DEFAULT: '#6D5BD0',
+                light: '#8B7BE8',
+                dark: '#4F3FB0',
+                50: '#F1EEFB',
+                100: '#E4DEF8',
+              },
+              os: {
+                bg: '#F7F9FB',
+                ink: '#0F172A',
+              },
+            },
+            keyframes: {
+              fadeInUp: {
+                '0%': { opacity: '0', transform: 'translateY(12px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              floaty: {
+                '0%,100%': { transform: 'translateY(0)' },
+                '50%': { transform: 'translateY(-6px)' },
+              },
+              glowPulse: {
+                '0%,100%': { boxShadow: '0 0 0 0 rgba(109,91,208,0.0)' },
+                '50%': { boxShadow: '0 0 30px 4px rgba(109,91,208,0.25)' },
+              },
+              flowDash: {
+                to: { strokeDashoffset: '-16' },
+              },
+              shimmer: {
+                '100%': { transform: 'translateX(100%)' },
+              },
+            },
+            animation: {
+              fadeInUp: 'fadeInUp 0.5s ease-out both',
+              floaty: 'floaty 4s ease-in-out infinite',
+              glowPulse: 'glowPulse 3s ease-in-out infinite',
+              flowDash: 'flowDash 0.8s linear infinite',
+            },
+            fontFamily: {
+              sans: ['Inter', 'system-ui', 'Segoe UI', 'Roboto', 'sans-serif'],
+            },
+          },
+        },
+      };
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      html { scroll-behavior: smooth; }
+      body { background-color: #f5f8fc; }
+      /* Glow premium reutilizable */
+      .premium-glow { position: relative; }
+      .premium-glow::before {
+        content: '';
+        position: absolute;
+        inset: -1px;
+        border-radius: inherit;
+        background: linear-gradient(135deg, rgba(109,91,208,0.35), rgba(139,123,232,0.05));
+        filter: blur(14px);
+        opacity: 0;
+        transition: opacity 0.35s ease;
+        z-index: -1;
+      }
+      .premium-glow:hover::before { opacity: 1; }
+      /* Shimmer para badges/locks */
+      .shimmer { position: relative; overflow: hidden; }
+      .shimmer::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        transform: translateX(-100%);
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent);
+        animation: shimmer 2.6s infinite;
+      }
+      @keyframes shimmer { 100% { transform: translateX(100%); } }
+      /* Scrollbar sutil */
+      ::-webkit-scrollbar { width: 10px; height: 10px; }
+      ::-webkit-scrollbar-thumb { background: #d8e0ea; border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

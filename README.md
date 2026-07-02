@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Open Beauchef OS — Frontend (V1.0)
 
 Sistema operativo para startups de **Paloma (Decantopia)**. Incluye el
@@ -219,3 +220,6 @@ ingreso promedio ≈ $9,5M/mes, EBITDA promedio ≈ $3,0M (31,5% de margen),
 saldo actual ≈ $23,0M. El runway se estima como saldo ÷ gasto mensual promedio.
 Como el negocio es flujo-positivo, los escenarios de proyección pueden mostrar
 runway "∞"; baja el % del slider o ajusta el saldo inicial para ver un runway finito.
+=======
+# open-beauchef-os
+>>>>>>> d907c2ea7518dcf9ffaf6338f3218b89a334f499

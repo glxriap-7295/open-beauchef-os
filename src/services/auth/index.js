@@ -79,5 +79,11 @@ const localAuthProvider = {
   },
 };
 
-const PROVIDERS = { local: localAuthProvider };
-export const auth = PROVIDERS[import.meta.env.VITE_AUTH_PROVIDER || 'local'] || localAuthProvider;
+import { firebaseHabilitado } from '../firebase/app.js';
+import { firebaseAuthProvider } from './firebaseAuthProvider.js';
+
+const elegido = import.meta.env.VITE_AUTH_PROVIDER || 'local';
+// Firebase solo si está pedido Y configurado; si no, LocalStorage (default).
+export const auth = (elegido === 'firebase' && firebaseHabilitado())
+  ? firebaseAuthProvider
+  : localAuthProvider;

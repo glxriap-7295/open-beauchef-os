@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { usePreparacion } from '../../context/PreparacionContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { esAdmin } from '../../utils/admin.js';
 
 function Icon({ name, className = 'h-5 w-5' }) {
   const paths = {
@@ -80,6 +81,7 @@ export default function Sidebar({ onNavigate }) {
         <Item to="/copiloto" icon="copiloto" badge="Nuevo">Copiloto Financiero IA</Item>
         <Item to="/mentores" icon="mentor" locked={!mentorDesbloqueado}>Mentores</Item>
         <Item to="/configuracion" icon="settings">Configuración</Item>
+        {esAdmin(user?.email) && <Item to="/admin" icon="reportes" badge="Admin">Administración</Item>}
 
         <p className="px-3 pb-1 pt-5 text-[11px] font-semibold uppercase tracking-wider text-slate-300">Próximamente</p>
         <div className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-300">

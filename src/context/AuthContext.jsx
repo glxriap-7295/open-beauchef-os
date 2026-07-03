@@ -13,9 +13,18 @@ export function AuthProvider({ children }) {
   const [ready, setReady] = useState(false);
 
   // Restaura la sesión previa al montar.
+  // Firebase la restaura de forma asíncrona (onAuthChange); Local es síncrono.
   useEffect(() => {
+    if (typeof auth.onAuthChange === 'function') {
+      const unsub = auth.onAuthChange((u) => {
+        setUser(u);
+        setReady(true);
+      });
+      return unsub;
+    }
     setUser(auth.getSession());
     setReady(true);
+    return undefined;
   }, []);
 
   const register = useCallback(async (datos) => {

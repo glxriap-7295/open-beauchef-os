@@ -278,6 +278,17 @@ export function PreparacionProvider({ children }) {
     setEstado((prev) => ({ ...prev, notificacionesActivas: activas }));
   }, []);
 
+  /** Reemplaza el estado con uno traído de la nube (Firestore). No-op si vacío. */
+  const hidratar = useCallback((nuevo) => {
+    if (!nuevo || typeof nuevo !== 'object') return;
+    setEstado((prev) => ({
+      ...ESTADO_INICIAL,
+      ...prev,
+      ...nuevo,
+      perfil: { ...ESTADO_INICIAL.perfil, ...(nuevo.perfil || {}) },
+    }));
+  }, []);
+
   const reiniciar = useCallback(() => setEstado(ESTADO_INICIAL), []);
 
   const value = useMemo(
@@ -309,6 +320,8 @@ export function PreparacionProvider({ children }) {
       cancelarInvitacion,
       eliminarMiembro,
       setNotificaciones,
+      hidratar,
+      estadoRaw: estado,
       reiniciar,
     }),
     [
@@ -317,7 +330,7 @@ export function PreparacionProvider({ children }) {
       subirDocumento, setEstadoDocumento, renombrarDocumento, eliminarDocumento,
       alternarTarea, setFuenteFinanciera, importarTransacciones, setFintoc, limpiarFinanzas,
       agregarLogro, asegurarOwner, invitarMiembro,
-      cancelarInvitacion, eliminarMiembro, setNotificaciones, reiniciar,
+      cancelarInvitacion, eliminarMiembro, setNotificaciones, hidratar, reiniciar,
     ]
   );
 

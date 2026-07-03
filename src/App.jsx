@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { PreparacionProvider } from './context/PreparacionContext.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
+import CloudSync from './components/CloudSync.jsx';
 import HomePage from './pages/HomePage.jsx';
 import Login from './pages/Login.jsx';
 import Registro from './pages/Registro.jsx';
@@ -13,6 +14,7 @@ import CopilotoFinanciero from './pages/CopilotoFinanciero.jsx';
 import WalkthroughFuturo from './pages/WalkthroughFuturo.jsx';
 import Mentores from './pages/Mentores.jsx';
 import Configuracion from './pages/Configuracion.jsx';
+import Admin from './pages/Admin.jsx';
 
 function Privada({ children }) {
   return <ProtectedRoute>{children}</ProtectedRoute>;
@@ -22,6 +24,7 @@ export default function App() {
   return (
     <AuthProvider>
       <PreparacionProvider>
+        <CloudSync />
         <Routes>
           {/* Público */}
           <Route path="/" element={<HomePage />} />
@@ -34,6 +37,7 @@ export default function App() {
           <Route path="/herramientas" element={<Privada><CentroHerramientas /></Privada>} />
           <Route path="/mentores" element={<Privada><Mentores /></Privada>} />
           <Route path="/configuracion" element={<Privada><Configuracion /></Privada>} />
+          <Route path="/admin" element={<Privada><Admin /></Privada>} />
 
           {/* Copiloto Financiero IA */}
           <Route path="/copiloto" element={<Privada><CopilotoFinanciero /></Privada>} />

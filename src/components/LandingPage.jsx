@@ -13,29 +13,37 @@ export default function LandingPage() {
 
       <section className="mx-auto flex max-w-5xl flex-col items-center px-6 py-20 text-center sm:py-28">
         <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-brand/20 bg-brand-50 px-4 py-1.5 text-sm font-semibold text-brand">
-          MVP · Decantopia
+Programa Piloto
         </span>
 
         <h1 className="text-4xl font-extrabold leading-tight tracking-tight text-slate-900 sm:text-6xl">
-          Bienvenidx al MVP <br className="hidden sm:block" />
-          <span className="text-brand">Financial Copilot</span> 🎉
+          Bienvenido a <br className="hidden sm:block" />
+          <span className="text-brand">Open Beauchef OS</span>
         </h1>
 
         <p className="mt-6 text-xl font-semibold text-slate-700 sm:text-2xl">
-          La plataforma que automatiza tu contabilidad
+          El sistema operativo para startups impulsado por IA.
         </p>
 
         <p className="mt-4 max-w-2xl text-base text-slate-500 sm:text-lg">
-          Aquí ves tus finanzas en tiempo real. Sin papeles, sin excel, sin estrés.
+          Perfil, preparación, copilotos y finanzas en un solo lugar. Menos trabajo administrativo, más foco en construir tu empresa.
         </p>
 
-        <button
-          onClick={() => navigate('/app')}
-          className="group mt-10 inline-flex items-center gap-2 rounded-xl bg-brand px-8 py-4 text-lg font-semibold text-white shadow-lg shadow-brand/30 transition hover:bg-brand-dark hover:shadow-brand/40 focus:outline-none focus:ring-4 focus:ring-brand/30"
-        >
-          Acceder al Dashboard
-          <span className="transition-transform group-hover:translate-x-1">→</span>
-        </button>
+        <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row">
+          <button
+            onClick={() => navigate('/registro')}
+            className="group inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand px-8 py-4 text-lg font-semibold text-white shadow-lg shadow-brand/30 transition hover:bg-brand-dark hover:shadow-brand/40 focus:outline-none focus:ring-4 focus:ring-brand/30 sm:w-auto"
+          >
+            Crear cuenta
+            <span className="transition-transform group-hover:translate-x-1">→</span>
+          </button>
+          <button
+            onClick={() => navigate('/login')}
+            className="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-8 py-4 text-lg font-semibold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
+          >
+            Iniciar sesión
+          </button>
+        </div>
 
         {/* Features */}
         <div className="mt-20 grid w-full gap-5 sm:grid-cols-3">
@@ -54,7 +62,7 @@ export default function LandingPage() {
       </section>
 
       <footer className="border-t border-slate-200 py-8 text-center text-sm text-slate-400">
-        Financial Copilot · Hecho para Paloma (Decantopia)
+        Open Beauchef OS · El sistema operativo para startups
       </footer>
     </main>
   );

@@ -9,6 +9,37 @@ Todo en español.
 
 > Landing → Panel Principal → Centro de Herramientas → Copiloto Financiero.
 
+## Novedades del piloto (V1.1)
+
+- **Genérico para cualquier startup.** Sin datos de una empresa específica.
+  El perfil parte vacío y se llena solo con AI Discovery / edición. Decantopia
+  existe únicamente como **Dataset de Demostración** opcional del Copiloto.
+- **Autenticación con sesión persistente.** Crear cuenta / Iniciar sesión; la
+  sesión se restaura al abrir la app y solo se cierra con "Cerrar sesión"
+  (LocalStorage; arquitectura compatible con Firebase Auth). Rutas privadas con
+  guard.
+- **Onboarding express (<5 min):** nombre, sitio web, LinkedIn, industria y
+  documentos (todo opcional salvo el nombre). El resto lo descubre la IA.
+- **Sin métricas falsas.** El Nivel de Preparación y sus dimensiones se derivan
+  de datos reales del perfil (0% al empezar). Empty states que guían.
+- **Copiloto Financiero con puerta de conexión:** Fintoc, CSV, Excel, PDF
+  (próximamente) o **cargar dataset de ejemplo**. El dashboard solo aparece con
+  datos. Cálculos/gráficos/animaciones intactos.
+- **Copiloto Marketing IA:** ROAS (misma lógica de planilla), asignación de
+  presupuesto, recomendaciones e insights IA; CAC/LTV/Meta/Google con empty
+  states. Gratis durante el piloto.
+- **Configuración** completa: Perfil, Startup, Equipo (invitar colaboradores,
+  roles Owner/Empleado), Integraciones, Notificaciones (toggle + permiso),
+  Facturación (piloto gratis; precios Starter $39 / Growth $89 / Scale custom).
+- **Mentor Matching:** estado "En revisión" (sin matches falsos).
+- Deploy en **Vercel** + **PWA** (manifest, theme-color, rewrite SPA).
+
+> **Build de producción:** este entorno de trabajo no tiene registro npm, así
+> que el `npm run build` debe ejecutarse en tu máquina/CI:
+> `npm install && npm run build && npm run preview`. La verificación estática
+> (resolución de imports de los 51 módulos, integridad de archivos, lógica pura)
+> está hecha; corre el build antes del piloto para el chequeo final.
+
 ## Novedades V1.0
 
 - **AI Discovery** — sube evidencia, la IA la analiza y conversa (estilo ChatGPT)
@@ -63,6 +94,19 @@ Todas son **opcionales** (la app corre en modo demo sin ninguna). Ver
 2. Define las variables de entorno que quieras activar (todas opcionales).
 3. Deploy. `vercel.json` ya incluye el rewrite SPA para que las rutas funcionen
    al recargar.
+
+**Open Banking real (Fintoc).** El proyecto incluye funciones serverless en
+`api/fintoc/` (`accounts.js`, `movements.js`) que consultan la API de Fintoc con
+tu **secret key** — que vive SOLO en el servidor. Para activarlo en Vercel:
+
+- Frontend: `VITE_FINTOC_ENABLED=true`, `VITE_FINTOC_PUBLIC_KEY=pk_...`,
+  `VITE_FINTOC_LINK_ENDPOINT=/api/fintoc`.
+- Servidor (Environment Variables de Vercel, sin prefijo `VITE_`):
+  `FINTOC_SECRET_KEY=sk_...`.
+
+Primera sincronización: últimos 90 días. Las siguientes traen solo movimientos
+nuevos (se guarda la última fecha por link). Si falta cualquier credencial, la
+app ofrece **Carga Manual** automáticamente.
 
 ---
 

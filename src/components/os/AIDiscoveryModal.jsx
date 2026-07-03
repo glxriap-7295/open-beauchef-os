@@ -8,8 +8,9 @@ import { TIPOS_EVIDENCIA, completitudPerfil } from '../../data/profileSchema.js'
 export default function AIDiscoveryModal({ onClose }) {
   const {
     perfil, documentos, subirDocumento, setEstadoDocumento,
-    actualizarPerfil, agregarLogro,
+    actualizarPerfil, agregarLogro, notificacionesActivas,
   } = usePreparacion();
+  const avisar = (evento) => { if (notificacionesActivas) notifications.emitir(evento); };
 
   const ai = getAIProvider();
   const [paso, setPaso] = useState('intro'); // intro | analizando | chat | listo
@@ -20,6 +21,7 @@ export default function AIDiscoveryModal({ onClose }) {
   const [input, setInput] = useState('');
   const [pensando, setPensando] = useState(false);
   const perfilRef = useRef({ ...perfil });
+  const contenidosRef = useRef({}); // id -> texto extraído (para Ollama)
   const fileRef = useRef(null);
   const scrollRef = useRef(null);
 
@@ -27,12 +29,26 @@ export default function AIDiscoveryModal({ onClose }) {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [mensajes, pensando]);
 
-  const subir = (nombre) => {
+  const subir = (nombre, contenido = '') => {
     const id = subirDocumento({ nombre, tipo });
+    if (contenido) contenidosRef.current[id] = contenido;
     return id;
   };
-  const onFiles = (e) => {
-    Array.from(e.target.files || []).forEach((f) => subir(f.name));
+
+  // Lee texto real de archivos de texto (los binarios se pasan solo por nombre/tipo).
+  const leerTexto = async (file) => {
+    const esTexto = /^(text\/|application\/(json|csv))/.test(file.type) || /\.(txt|csv|md|json|tsv)$/i.test(file.name);
+    if (!esTexto) return '';
+    try { return (await file.text()).slice(0, 6000); } catch { return ''; }
+  };
+
+  const onFiles = async (e) => {
+    const files = Array.from(e.target.files || []);
+    for (const f of files) {
+      // eslint-disable-next-line no-await-in-loop
+      const texto = await leerTexto(f);
+      subir(f.name, texto);
+    }
     e.target.value = '';
   };
 
@@ -43,13 +59,15 @@ export default function AIDiscoveryModal({ onClose }) {
     // Marca los documentos como analizados (evidencia procesada).
     documentos.forEach((d) => setEstadoDocumento(d.id, 'Analizado'));
 
-    const { detectados, resumen: res } = await ai.analyzeEvidence(documentos, perfilRef.current);
+    // Enriquece con el contenido real leído (Ollama lo usa para extraer).
+    const docsEnriquecidos = documentos.map((d) => ({ ...d, contenido: contenidosRef.current[d.id] || '' }));
+    const { detectados, resumen: res } = await ai.analyzeEvidence(docsEnriquecidos, perfilRef.current);
     if (Object.keys(detectados).length) {
       perfilRef.current = { ...perfilRef.current, ...detectados };
       actualizarPerfil(detectados);
     }
     setResumen(res);
-    notifications.emitir(NotificationEvents.analisisCompleto('Tu evidencia'));
+    avisar(NotificationEvents.analisisCompleto('Tu evidencia'));
 
     // Primera pregunta
     const q = await ai.nextQuestion(perfilRef.current, []);
@@ -91,7 +109,7 @@ export default function AIDiscoveryModal({ onClose }) {
 
   const finalizar = () => {
     agregarLogro('AI Discovery completado', '🧠');
-    notifications.emitir(NotificationEvents.nuevaRecomendacion('Tu perfil se actualizó. Revisa el Roadmap para tus próximos pasos.'));
+    avisar(NotificationEvents.nuevaRecomendacion('Tu perfil se actualizó. Revisa el Roadmap para tus próximos pasos.'));
     setPaso('listo');
   };
 

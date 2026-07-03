@@ -1,4 +1,4 @@
-import { camposFaltantes } from '../../data/profileSchema.js';
+import { camposFaltantes, PROFILE_FIELDS } from '../../data/profileSchema.js';
 
 /**
  * Proveedor de IA basado en Ollama (local, gratuito, privado).
@@ -47,11 +47,16 @@ export const ollamaProvider = {
   },
 
   async analyzeEvidence(documentos = [], perfil = {}) {
-    const lista = documentos.map((d) => `- ${d.nombre} (${d.tipo})`).join('\n') || '(sin documentos)';
-    const prompt = `Eres un analista de startups. Documentos disponibles:\n${lista}\n\n` +
-      `Perfil actual (JSON): ${JSON.stringify(perfil)}\n\n` +
-      `Devuelve SOLO un JSON con la forma {"detectados": {campo: valor}, "resumen": "texto breve en español"}. ` +
-      `"detectados" son datos que razonablemente estarían en esos documentos y hoy faltan en el perfil.`;
+    const lista = documentos
+      .map((d) => `— ${d.nombre} (${d.tipo})${d.contenido ? `\nContenido:\n${d.contenido}` : ''}`)
+      .join('\n\n') || '(sin documentos)';
+    const campos = PROFILE_FIELDS.map((f) => `${f.key} (${f.label})`).join(', ');
+    const prompt = `Eres un analista de startups. Extrae la mayor cantidad de información posible desde estos ` +
+      `documentos:\n\n${lista}\n\nPerfil actual (JSON): ${JSON.stringify(perfil)}\n\n` +
+      `Campos posibles: ${campos}.\n` +
+      `Devuelve SOLO un JSON válido con la forma {"detectados": {campo: valor}, "resumen": "texto breve en español"}. ` +
+      `Incluye en "detectados" únicamente campos que aparezcan o se infieran claramente del contenido y que hoy ` +
+      `estén vacíos en el perfil. No inventes datos que no estén en los documentos.`;
     const raw = await generar(prompt, { json: true });
     const parsed = JSON.parse(raw);
     return { detectados: parsed.detectados || {}, resumen: parsed.resumen || 'Análisis completado.' };

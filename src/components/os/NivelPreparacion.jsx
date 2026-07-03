@@ -60,8 +60,9 @@ function Sparkline({ data }) {
 }
 
 export default function NivelPreparacion() {
-  const { nivel, etapaActual, proximaEtapa, dimensiones, tendencia } = usePreparacion();
-  const delta = tendencia.length >= 2 ? tendencia[tendencia.length - 1] - tendencia[tendencia.length - 2] : 0;
+  const { nivel, etapaActual, proximaEtapa, dimensiones, tendencia = [] } = usePreparacion();
+  const hayTendencia = tendencia.length >= 2;
+  const delta = hayTendencia ? tendencia[tendencia.length - 1] - tendencia[tendencia.length - 2] : 0;
 
   return (
     <section className="overflow-hidden rounded-3xl border border-slate-100 bg-white p-6 shadow-sm sm:p-8">
@@ -81,13 +82,19 @@ export default function NivelPreparacion() {
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Próxima etapa</p>
               <p className="text-lg font-bold text-premium-dark">{proximaEtapa}</p>
             </div>
-            <div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2">
-              <Sparkline data={tendencia} />
-              <div className="leading-tight">
-                <p className="text-xs text-emerald-700">Tendencia</p>
-                <p className="text-sm font-bold text-emerald-700">{delta >= 0 ? '↑' : '↓'} {Math.abs(delta)} pts esta semana</p>
+            {hayTendencia ? (
+              <div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2">
+                <Sparkline data={tendencia} />
+                <div className="leading-tight">
+                  <p className="text-xs text-emerald-700">Tendencia</p>
+                  <p className="text-sm font-bold text-emerald-700">{delta >= 0 ? '↑' : '↓'} {Math.abs(delta)} pts esta semana</p>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="rounded-xl bg-slate-50 px-3 py-2">
+                <p className="text-xs font-semibold text-slate-500">Tu preparación crece a medida que completas tu perfil.</p>
+              </div>
+            )}
           </div>
         </div>
 

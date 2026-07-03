@@ -6,26 +6,28 @@ import { PROFILE_FIELDS, camposFaltantes } from '../../data/profileSchema.js';
  * misma interfaz que cualquier AIProvider real.
  */
 
-// Qué campos "extrae" cada tipo de evidencia (para no preguntar lo que ya
-// está en los documentos). Valores plausibles para Decantopia.
+// Qué campos "cubre" cada tipo de evidencia. El asistente local no lee el
+// contenido real del archivo, así que marca el campo como detectado con un
+// placeholder editable (genérico, sin inventar datos de negocio específicos).
+// El proveedor real (Ollama) sí extrae el contenido.
+const P = (doc) => `Detectado desde tu ${doc}. Edítalo en tu Startup Card cuando quieras.`;
 const EXTRACCION = {
   'Pitch Deck': {
-    problema: 'Comprar buen vino y destilados es confuso: mucha oferta, poca guía y precios opacos.',
-    solucion: 'Curamos y vendemos vinos y destilados online con recomendaciones personalizadas y despacho rápido.',
-    clienteObjetivo: 'Profesionales 28-45 en Chile que disfrutan el buen beber y compran online.',
-    competidores: 'Tiendas tradicionales, La Vinoteca y marketplaces generalistas; nos diferenciamos por curaduría e IA.',
-    equipo: 'Paloma (CEO) y equipo de operaciones y growth.',
+    problema: P('Pitch Deck'),
+    solucion: P('Pitch Deck'),
+    clienteObjetivo: P('Pitch Deck'),
+    competidores: P('Pitch Deck'),
+    equipo: P('Pitch Deck'),
   },
   'Modelo Financiero': {
-    infoFinanciera: 'Ventas ~CLP 9,5M/mes, margen EBITDA ~31%, caja saludable con flujo positivo.',
-    revenueModel: 'Venta directa (DTC) por transacción, con foco en recompra y ticket promedio.',
-    pricing: 'Precio por producto con packs y suscripción de degustación mensual.',
+    infoFinanciera: P('Modelo Financiero'),
+    revenueModel: P('Modelo Financiero'),
+    pricing: P('Modelo Financiero'),
   },
   'Modelo de Negocio': {
-    modeloNegocio: 'E-commerce DTC de vinos y destilados curados, con logística propia de última milla.',
+    modeloNegocio: P('Modelo de Negocio'),
   },
-  'Sitio Web': { sitioWeb: 'https://decantopia.cl' },
-  Legal: { iprl: '4' },
+  'Sitio Web': { sitioWeb: P('Sitio Web') },
 };
 
 function pausa(ms) {

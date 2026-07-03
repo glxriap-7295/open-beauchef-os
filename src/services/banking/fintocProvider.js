@@ -15,7 +15,8 @@
  */
 const PUBLIC_KEY = import.meta.env.VITE_FINTOC_PUBLIC_KEY || '';
 const ENABLED = String(import.meta.env.VITE_FINTOC_ENABLED || '') === 'true';
-const LINK_ENDPOINT = import.meta.env.VITE_FINTOC_LINK_ENDPOINT || '';
+// Por defecto usa las funciones serverless incluidas en /api/fintoc.
+const LINK_ENDPOINT = import.meta.env.VITE_FINTOC_LINK_ENDPOINT || '/api/fintoc';
 const WIDGET_SRC = 'https://js.fintoc.com/v1/';
 
 let widgetPromise = null;
@@ -61,6 +62,8 @@ export const fintocProvider = {
       try {
         const widget = Fintoc.create({
           publicKey: PUBLIC_KEY,
+          holderType: 'business',
+          product: 'movements',
           widgetToken,
           onSuccess: (link) => { onSuccess?.(link); resolve(link); },
           onExit: () => { onExit?.(); reject(new Error('El usuario cerró el widget.')); },
@@ -70,5 +73,54 @@ export const fintocProvider = {
         reject(e);
       }
     });
+  },
+
+  /**
+   * Flujo completo real: abre el widget oficial, obtiene el link_token, y a
+   * través del backend serverless (secret key nunca en el front) importa
+   * cuentas + movimientos. Primera sync: últimos 90 días. Siguientes: solo
+   * nuevos desde la última sincronización (guardada por link).
+   */
+  async conectarYSincronizar() {
+    if (!this.disponible()) throw new Error(this.motivoNoDisponible());
+    const link = await this.conectar({});
+    const linkToken = link?.id || link?.link_token || link;
+    if (!linkToken) throw new Error('Fintoc no devolvió un link válido.');
+
+    const base = LINK_ENDPOINT.replace(/\/$/, '');
+    const accRes = await fetch(`${base}/accounts?link_token=${encodeURIComponent(linkToken)}`);
+    if (!accRes.ok) {
+      const t = await accRes.json().catch(() => ({}));
+      throw new Error(t.error || 'No se pudieron importar las cuentas.');
+    }
+    const { accounts = [] } = await accRes.json();
+
+    // Sincronización incremental: recupera la última fecha guardada por link.
+    const syncKey = `ob_fintoc_sync_${linkToken}`;
+    let ultimaGuardada = null;
+    try { ultimaGuardada = JSON.parse(localStorage.getItem(syncKey) || 'null'); } catch { /* noop */ }
+    const since = ultimaGuardada?.lastSync || null; // null => backend usa 90 días
+
+    const movimientos = [];
+    for (const acc of accounts) {
+      const q = new URLSearchParams({ link_token: linkToken, account_id: acc.id });
+      if (since) q.set('since', since);
+      const mvRes = await fetch(`${base}/movements?${q.toString()}`);
+      if (!mvRes.ok) continue;
+      const { movimientos: ms = [] } = await mvRes.json();
+      for (const m of ms) {
+        movimientos.push({
+          fecha: (m.transaction_date || m.post_date || '').slice(0, 10),
+          monto: Number(m.amount) || 0,
+          descripcion: m.description || m.reference || 'Movimiento',
+        });
+      }
+    }
+
+    const ultimaSync = new Date().toISOString();
+    try { localStorage.setItem(syncKey, JSON.stringify({ lastSync: ultimaSync.slice(0, 10), linkToken })); } catch { /* noop */ }
+
+    const banco = accounts[0]?.institution?.name || accounts[0]?.holder_name || 'Tu banco';
+    return { banco, cuentas: accounts, movimientos, ultimaSync, linkToken };
   },
 };

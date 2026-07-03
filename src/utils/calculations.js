@@ -4,6 +4,18 @@
  */
 import { PALOMA_MESES, SALDO_INICIAL } from '../data/palomaData.js';
 
+/**
+ * ROAS = ventas atribuibles / inversión en marketing.
+ * Misma lógica que la planilla del Copiloto Financiero (no se inventan fórmulas).
+ * Devuelve null si no hay inversión (indefinido).
+ */
+export function roas({ ventas, inversion }) {
+  const rev = Number(ventas) || 0;
+  const spend = Math.abs(Number(inversion) || 0);
+  if (spend === 0) return { ventas: rev, inversion: 0, roas: null, definido: false };
+  return { ventas: rev, inversion: spend, roas: Math.round((rev / spend) * 100) / 100, definido: true };
+}
+
 /** Deriva las métricas de un mes a partir de su desglose. */
 export function derivarMes(m) {
   const ingresos = m.ventas;
@@ -34,6 +46,52 @@ export function derivarMes(m) {
 /** Lista de todos los meses ya derivados. */
 export function getMesesDerivados(meses = PALOMA_MESES) {
   return meses.map(derivarMes);
+}
+
+const NOMBRE_MES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+const CORTO_MES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+/**
+ * Convierte transacciones reales (fecha, monto, descripción) en la misma
+ * estructura de "meses derivados" que consumen el Dashboard, Estado de
+ * Resultado y Flujo de Caja. Los gastos van a "otros" (categoría genérica),
+ * ya que un movimiento bancario crudo no trae desglose de COGS.
+ */
+export function transaccionesAMeses(transacciones = []) {
+  const porMes = new Map();
+  for (const t of transacciones) {
+    const fecha = String(t.fecha || '');
+    const m = fecha.match(/^(\d{4})-(\d{2})/);
+    if (!m) continue;
+    const key = `${m[1]}-${m[2]}`;
+    const mesIdx = Number(m[2]) - 1;
+    if (!porMes.has(key)) {
+      porMes.set(key, { key, nombre: `${NOMBRE_MES[mesIdx]} ${m[1]}`, corto: CORTO_MES[mesIdx], ingresos: 0, gastos: 0 });
+    }
+    const acc = porMes.get(key);
+    const monto = Number(t.monto) || 0;
+    if (monto >= 0) acc.ingresos += monto;
+    else acc.gastos += Math.abs(monto);
+  }
+
+  return [...porMes.values()]
+    .sort((a, b) => a.key.localeCompare(b.key))
+    .map((mm) => {
+      const gastosTotales = mm.gastos;
+      const ebitda = mm.ingresos - gastosTotales;
+      return {
+        key: mm.key,
+        nombre: mm.nombre,
+        corto: mm.corto,
+        ingresos: mm.ingresos,
+        cogs: 0, cogsProd: 0, cogsEnvio: 0, cogsTrans: 0,
+        gastosOperacionales: gastosTotales,
+        empleados: 0, herramientas: 0, otros: gastosTotales,
+        gastosTotales,
+        ebitda,
+        margen: mm.ingresos > 0 ? (ebitda / mm.ingresos) * 100 : 0,
+      };
+    });
 }
 
 /** Suma consolidada de un conjunto de meses derivados. */

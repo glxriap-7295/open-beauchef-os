@@ -3,10 +3,10 @@ import ToolModal from './ToolModal.jsx';
 import { usePreparacion } from '../../context/PreparacionContext.jsx';
 
 const CAMPOS = [
-  { id: 'nombre', label: 'Nombre de la startup', tipo: 'input', placeholder: 'Decantopia' },
-  { id: 'industria', label: 'Industria', tipo: 'input', placeholder: 'E-commerce de vinos y destilados' },
+  { id: 'nombre', label: 'Nombre de la startup', tipo: 'input', placeholder: 'Ej: Acme Inc.' },
+  { id: 'industria', label: 'Industria', tipo: 'input', placeholder: 'Ej: SaaS, Fintech, Retail…' },
   { id: 'etapa', label: 'Etapa', tipo: 'select', opciones: ['Idea', 'Validando Mercado', 'Preparándose para Escalar', 'Escalando'] },
-  { id: 'sitioWeb', label: 'Sitio web', tipo: 'input', placeholder: 'https://decantopia.cl' },
+  { id: 'sitioWeb', label: 'Sitio web', tipo: 'input', placeholder: 'https://…' },
   { id: 'problema', label: 'Problema que resuelves', tipo: 'textarea', placeholder: '¿Qué dolor de tus clientes resuelves?' },
   { id: 'solucion', label: 'Solución', tipo: 'textarea', placeholder: '¿Cómo lo resuelves?' },
   { id: 'modeloNegocio', label: 'Modelo de negocio y pricing', tipo: 'textarea', placeholder: '¿Cómo generas ingresos?' },

@@ -6,7 +6,7 @@ import { usePreparacion } from '../../context/PreparacionContext.jsx';
 import { formatCLP } from '../../utils/formatters.js';
 
 export default function ConectarDatosModal({ onClose }) {
-  const { setFuenteFinanciera, agregarLogro } = usePreparacion();
+  const { agregarLogro, importarTransacciones, notificacionesActivas } = usePreparacion();
   const [metodo, setMetodo] = useState(null); // 'fintoc' | 'manual'
   const [resultado, setResultado] = useState(null);
   const [cargando, setCargando] = useState(false);
@@ -15,18 +15,24 @@ export default function ConectarDatosModal({ onClose }) {
 
   const fintocOk = banking.openBankingDisponible();
 
+  const avisar = (evento) => { if (notificacionesActivas) notifications.emitir(evento); };
+
   const conectarFintoc = async () => {
     setError('');
     setCargando(true);
     try {
-      // En producción, el widgetToken lo emite tu backend con la secret key.
-      await banking.fintoc.conectar({});
-      setFuenteFinanciera('fintoc');
-      setResultado({ tipo: 'fintoc' });
-      notifications.emitir(NotificationEvents.analisisCompleto('Tu banco (Open Banking)'));
+      const { banco, cuentas, movimientos, ultimaSync, linkToken } = await banking.fintoc.conectarYSincronizar();
+      importarTransacciones(movimientos, {
+        fuente: 'fintoc',
+        fintoc: { conectado: true, banco, cuentas: Array.isArray(cuentas) ? cuentas.length : (cuentas || 0), ultimaSync, linkToken },
+      });
+      setResultado({ tipo: 'fintoc', banco, cuentas: Array.isArray(cuentas) ? cuentas.length : (cuentas || 0), movimientos: movimientos.length });
+      avisar(NotificationEvents.analisisCompleto(`Sincronización de ${banco || 'tu banco'}`));
       agregarLogro('Cuenta bancaria conectada (Open Banking)', '🏦');
     } catch (e) {
-      setError(e.message || 'No se pudo conectar con Fintoc en este entorno.');
+      // Fallback elegante: si Fintoc falla, ofrecemos Carga Manual.
+      setError(`${e.message || 'No se pudo conectar con Fintoc.'} Puedes usar Carga Manual mientras tanto.`);
+      setMetodo('manual');
     } finally {
       setCargando(false);
     }
@@ -40,11 +46,14 @@ export default function ConectarDatosModal({ onClose }) {
     try {
       const { movimientos, resumen } = await banking.manual.procesarArchivo(file);
       if (!movimientos.length) {
-        setError('No encontramos movimientos en el archivo. Revisa el formato (fecha, descripción, monto).');
+        const esExcel = /\.xlsx?$/i.test(file.name);
+        setError(esExcel
+          ? 'No pudimos leer ese Excel. Ábrelo y expórtalo como CSV (Archivo → Guardar como → CSV) y vuelve a subirlo.'
+          : 'No encontramos movimientos. Revisa que el archivo tenga columnas de fecha, descripción y monto.');
       } else {
-        setFuenteFinanciera('manual');
+        importarTransacciones(movimientos, { fuente: 'manual' });
         setResultado({ tipo: 'manual', nombre: file.name, resumen });
-        notifications.emitir(NotificationEvents.analisisCompleto(file.name));
+        avisar(NotificationEvents.analisisCompleto(file.name));
         agregarLogro('Cartola cargada al Copiloto Financiero', '📄');
       }
     } catch {
@@ -142,7 +151,11 @@ export default function ConectarDatosModal({ onClose }) {
               <div><p className="text-slate-500">Neto</p><p className="font-bold text-slate-800">{formatCLP(resultado.resumen.neto)}</p></div>
             </div>
           ) : (
-            <p className="mt-1 text-sm text-slate-600">Tu banco quedó conectado vía Open Banking.</p>
+            <div className="mt-2 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+              <div><p className="text-slate-500">Banco</p><p className="font-bold text-slate-800">{resultado.banco || '—'}</p></div>
+              <div><p className="text-slate-500">Cuentas</p><p className="font-bold text-slate-800">{resultado.cuentas}</p></div>
+              <div><p className="text-slate-500">Movimientos</p><p className="font-bold text-slate-800">{resultado.movimientos}</p></div>
+            </div>
           )}
           <p className="mt-3 text-xs text-slate-500">
             El Copiloto Financiero usará esta fuente para clasificar tus movimientos y generar tus reportes.

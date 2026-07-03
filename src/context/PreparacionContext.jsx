@@ -3,79 +3,74 @@ import { perfilVacio } from '../data/profileSchema.js';
 import { persistence } from '../services/persistence/index.js';
 
 /**
- * Estado global de "Nivel de Preparación" del emprendedor.
- * Se comparte entre el Panel Principal, Recomendaciones IA, Centro de
- * Herramientas, el Copiloto Financiero y el walkthrough futuro.
- *
- * El nivel global se deriva del promedio de las dimensiones, de modo que
- * cuando una dimensión mejora (p. ej. al completar la demo financiera), el
- * nivel sube de forma coherente.
+ * Estado global del emprendedor. El Startup Profile es la única fuente de verdad;
+ * el Nivel de Preparación y sus dimensiones se DERIVAN de datos reales del perfil
+ * (nunca métricas inventadas). Un startup nuevo parte con el perfil vacío y el
+ * puntaje en 0, y sube a medida que se completa la información.
  */
-
 const PreparacionContext = createContext(null);
-const STORAGE_KEY = 'ob_preparacion_v4';
+const STORAGE_KEY = 'ob_preparacion_v5';
 
 const ESTADO_INICIAL = {
-  empresa: 'Decantopia',
-  fundadora: 'Paloma',
-  etapaActual: 'Validando Mercado',
-  proximaEtapa: 'Preparándose para Escalar',
-  // Perfil de la startup — única fuente de verdad del OS. Varios campos parten
-  // vacíos a propósito, para que AI Discovery, Gap Analysis y Roadmap tengan
-  // acciones reales que resolver.
-  perfil: {
-    ...perfilVacio(),
-    nombre: 'Decantopia',
-    industria: 'E-commerce de vinos y destilados',
-    etapa: 'Validando Mercado',
-  },
-  // Método de datos financieros elegido: null | 'fintoc' | 'manual'
-  fuenteFinanciera: null,
-  // Evidence Vault: documentos cargados con su estado de análisis.
+  fundadora: '',
+  etapaActual: 'Descubrimiento',
+  proximaEtapa: 'Validando Mercado',
+  // Perfil vacío: se llena con AI Discovery / edición manual.
+  perfil: { ...perfilVacio() },
   documentos: [],
-  // Tareas del Roadmap marcadas manualmente como completadas (por id).
   tareasManuales: [],
-  dimensiones: {
-    Comercial: 84,
-    Finanzas: 46,
-    Tecnología: 78,
-    Validación: 62,
-    Equipo: 70,
-  },
-  // Serie de tendencia (últimas semanas) del nivel de preparación.
-  tendencia: [52, 55, 58, 60, 63, 66, 68],
   recomendaciones: [
-    { id: 'startup-card', titulo: 'Completar Startup Card', mejora: 6, hecho: true,  tipo: 'gratuita' },
-    { id: 'pitch-deck',   titulo: 'Subir Pitch Deck',       mejora: 5, hecho: true,  tipo: 'gratuita' },
-    { id: 'finanzas',     titulo: 'Analizar Finanzas',      mejora: 12, hecho: false, tipo: 'copiloto', ruta: '/copiloto' },
-    { id: 'mentor',       titulo: 'Solicitar Mentor',       mejora: 8, hecho: false, tipo: 'mentor',   ruta: '/mentores' },
-    { id: 'fuentes',      titulo: 'Conectar futuras fuentes de datos', mejora: 9, hecho: false, tipo: 'copiloto', ruta: '/copiloto/futuro' },
+    { id: 'ai-discovery', titulo: 'Ejecutar AI Discovery', mejora: 15, hecho: false, tipo: 'gratuita', ruta: '/herramientas' },
+    { id: 'startup-card', titulo: 'Completar tu Startup Card', mejora: 8, hecho: false, tipo: 'gratuita', ruta: '/herramientas' },
+    { id: 'finanzas', titulo: 'Conectar tus finanzas', mejora: 12, hecho: false, tipo: 'copiloto', ruta: '/copiloto' },
+    { id: 'mentor', titulo: 'Solicitar Mentor', mejora: 8, hecho: false, tipo: 'mentor', ruta: '/mentores' },
+    { id: 'fuentes', titulo: 'Explorar la versión futura', mejora: 6, hecho: false, tipo: 'copiloto', ruta: '/copiloto/futuro' },
   ],
-  logros: [
-    { id: 'l1', titulo: 'Startup Card completada', fecha: 'Hace 2 días', icono: '🎯' },
-    { id: 'l2', titulo: 'Pitch Deck cargado', fecha: 'Hace 4 días', icono: '📊' },
-    { id: 'l3', titulo: 'Primer hito de validación', fecha: 'Hace 1 semana', icono: '✅' },
-  ],
-  // Hito que habilita Mentor Matching.
-  umbralMentor: 70,
+  logros: [],
+  // Equipo (colaboración). El owner se agrega al completar el onboarding.
+  miembros: [],
+  invitaciones: [],
+  // Preferencias
+  notificacionesActivas: false,
+  // Fuente de datos financieros: null | 'fintoc' | 'manual' | 'demo'
+  fuenteFinanciera: null,
+  // Datos financieros reales importados (CSV/Excel/Fintoc).
+  transacciones: [],
+  cuentasBancarias: [],
+  fintoc: { conectado: false, banco: '', cuentas: 0, ultimaSync: null, linkToken: null },
   copilotoActivado: false,
+  umbralMentor: 70,
 };
-
-function calcularNivel(dimensiones) {
-  const vals = Object.values(dimensiones);
-  if (!vals.length) return 0;
-  return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
-}
 
 function clamp(n, lo, hi) {
   return Math.max(lo, Math.min(hi, n));
 }
 
+function pctLlenos(keys, perfil) {
+  if (!keys.length) return 0;
+  const llenos = keys.filter((k) => String(perfil[k] || '').trim()).length;
+  return Math.round((llenos / keys.length) * 100);
+}
+
 /**
- * Deriva los objetivos de preparación a partir del Startup Profile y los
- * documentos del Evidence Vault. Cada objetivo "done" suma puntos al Nivel de
- * Preparación. Gap Analysis usa los no completados; el Roadmap usa todos.
- * `accion` indica qué herramienta abrir para resolverlo.
+ * Deriva las 5 dimensiones del Nivel de Preparación a partir de datos reales
+ * del perfil, la evidencia y la conexión financiera. Sin valores inventados.
+ */
+function calcularDimensiones(perfil = {}, documentos = [], fuente = null) {
+  const finBase = pctLlenos(['infoFinanciera', 'revenueModel', 'pricing'], perfil);
+  const finanzas = clamp(Math.round(finBase * 0.5) + (fuente ? 50 : 0), 0, 100);
+  return {
+    Comercial: pctLlenos(['clienteObjetivo', 'competidores', 'modeloNegocio'], perfil),
+    Finanzas: finanzas,
+    Tecnología: pctLlenos(['trl', 'solucion', 'sitioWeb'], perfil),
+    Validación: pctLlenos(['problema', 'brl', 'crl'], perfil),
+    Equipo: pctLlenos(['equipo', 'iprl'], perfil),
+  };
+}
+
+/**
+ * Objetivos derivados del perfil + documentos (motor de Gap Analysis / Roadmap).
+ * `auto` = ya resuelto por datos reales; el usuario puede además marcar manual.
  */
 function calcularObjetivos(perfil = {}, documentos = [], tareasManuales = []) {
   const tieneDoc = (tipo) => documentos.some((d) => d.tipo === tipo);
@@ -94,7 +89,6 @@ function calcularObjetivos(perfil = {}, documentos = [], tareasManuales = []) {
 function cargarEstado() {
   const saved = persistence.get(STORAGE_KEY);
   if (saved) {
-    // Fusiona perfil por si el esquema creció entre versiones.
     return { ...ESTADO_INICIAL, ...saved, perfil: { ...ESTADO_INICIAL.perfil, ...(saved.perfil || {}) } };
   }
   return ESTADO_INICIAL;
@@ -107,25 +101,29 @@ export function PreparacionProvider({ children }) {
     persistence.set(STORAGE_KEY, estado);
   }, [estado]);
 
-  // Objetivos derivados del perfil + documentos (motor de Gap Analysis / Roadmap).
+  const dimensiones = useMemo(
+    () => calcularDimensiones(estado.perfil, estado.documentos, estado.fuenteFinanciera),
+    [estado.perfil, estado.documentos, estado.fuenteFinanciera]
+  );
   const objetivos = useMemo(
     () => calcularObjetivos(estado.perfil, estado.documentos, estado.tareasManuales),
     [estado.perfil, estado.documentos, estado.tareasManuales]
   );
   const gaps = useMemo(() => objetivos.filter((o) => !o.done), [objetivos]);
+  // Bonus por tareas marcadas manualmente (no resueltas por datos).
   const bonusPreparacion = useMemo(
-    () => objetivos.reduce((s, o) => s + (o.done ? o.puntos : 0), 0),
+    () => objetivos.filter((o) => o.done && !o.auto).reduce((s, o) => s + o.puntos, 0),
     [objetivos]
   );
 
-  // El nivel base (promedio de dimensiones) + el bonus por objetivos completados.
-  const nivel = useMemo(
-    () => clamp(calcularNivel(estado.dimensiones) + bonusPreparacion, 0, 100),
-    [estado.dimensiones, bonusPreparacion]
-  );
+  const nivel = useMemo(() => {
+    const vals = Object.values(dimensiones);
+    const base = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+    return clamp(base + bonusPreparacion, 0, 100);
+  }, [dimensiones, bonusPreparacion]);
+
   const mentorDesbloqueado = nivel >= estado.umbralMentor;
 
-  /** Marca una recomendación como completada (idempotente). */
   const completarRecomendacion = useCallback((id) => {
     setEstado((prev) => ({
       ...prev,
@@ -133,42 +131,28 @@ export function PreparacionProvider({ children }) {
     }));
   }, []);
 
-  /**
-   * Acción central: al terminar la demo / walkthrough del Copiloto Financiero,
-   * sube la dimensión Finanzas, registra logro, actualiza recomendaciones y
-   * agrega un punto de tendencia.
-   */
+  /** Activa el Copiloto Financiero (walkthrough/demo). Sube Finanzas vía fuente. */
   const completarDemoFinanciera = useCallback(() => {
-    setEstado((prev) => {
-      const nuevasDim = { ...prev.dimensiones, Finanzas: Math.max(prev.dimensiones.Finanzas, 74) };
-      const nuevoNivel = calcularNivel(nuevasDim);
-      const yaRegistrado = prev.copilotoActivado;
-      return {
-        ...prev,
-        copilotoActivado: true,
-        dimensiones: nuevasDim,
-        etapaActual: nuevoNivel >= 70 ? 'Preparándose para Escalar' : prev.etapaActual,
-        proximaEtapa: nuevoNivel >= 70 ? 'Lista para Inversión' : prev.proximaEtapa,
-        recomendaciones: prev.recomendaciones.map((r) =>
-          r.id === 'finanzas' || r.id === 'fuentes' ? { ...r, hecho: true } : r
-        ),
-        logros: yaRegistrado
-          ? prev.logros
-          : [{ id: 'l-fin', titulo: 'Copiloto Financiero activado', fecha: 'Ahora', icono: '🤖' }, ...prev.logros],
-        tendencia: yaRegistrado ? prev.tendencia : [...prev.tendencia, nuevoNivel],
-      };
-    });
+    setEstado((prev) => ({
+      ...prev,
+      copilotoActivado: true,
+      fuenteFinanciera: prev.fuenteFinanciera || 'demo',
+      recomendaciones: prev.recomendaciones.map((r) =>
+        r.id === 'finanzas' || r.id === 'fuentes' ? { ...r, hecho: true } : r
+      ),
+      logros: prev.copilotoActivado
+        ? prev.logros
+        : [{ id: 'l-fin', titulo: 'Copiloto Financiero activado', fecha: 'Ahora', icono: '🤖' }, ...prev.logros].slice(0, 8),
+    }));
   }, []);
 
-  /** Startup Card: actualiza uno o más campos del perfil. */
   const actualizarPerfil = useCallback((patch) => {
     setEstado((prev) => {
       const nombre = patch.nombre !== undefined ? patch.nombre || prev.perfil.nombre : prev.perfil.nombre;
       return {
         ...prev,
-        empresa: nombre,
         etapaActual: patch.etapa || prev.etapaActual,
-        perfil: { ...prev.perfil, ...patch },
+        perfil: { ...prev.perfil, ...patch, nombre },
         recomendaciones: prev.recomendaciones.map((r) =>
           r.id === 'startup-card' ? { ...r, hecho: true } : r
         ),
@@ -176,7 +160,10 @@ export function PreparacionProvider({ children }) {
     });
   }, []);
 
-  /** Evidence Vault: agrega un documento (estado inicial "Pendiente"). */
+  const setFundadora = useCallback((nombre) => {
+    setEstado((prev) => ({ ...prev, fundadora: nombre }));
+  }, []);
+
   const subirDocumento = useCallback((doc) => {
     const id = `doc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     setEstado((prev) => ({
@@ -186,7 +173,6 @@ export function PreparacionProvider({ children }) {
     return id;
   }, []);
 
-  /** Evidence Vault: cambia el estado de análisis de un documento. */
   const setEstadoDocumento = useCallback((id, estadoDoc) => {
     setEstado((prev) => ({
       ...prev,
@@ -194,7 +180,6 @@ export function PreparacionProvider({ children }) {
     }));
   }, []);
 
-  /** Evidence Vault: renombra un documento. */
   const renombrarDocumento = useCallback((id, nombre) => {
     setEstado((prev) => ({
       ...prev,
@@ -202,12 +187,10 @@ export function PreparacionProvider({ children }) {
     }));
   }, []);
 
-  /** Evidence Vault: elimina un documento. */
   const eliminarDocumento = useCallback((id) => {
     setEstado((prev) => ({ ...prev, documentos: prev.documentos.filter((d) => d.id !== id) }));
   }, []);
 
-  /** Roadmap: marca/desmarca manualmente una tarea (objetivo) como completada. */
   const alternarTarea = useCallback((id) => {
     setEstado((prev) => {
       const ya = prev.tareasManuales.includes(id);
@@ -218,12 +201,46 @@ export function PreparacionProvider({ children }) {
     });
   }, []);
 
-  /** Financial Copilot: registra el método de conexión de datos elegido. */
   const setFuenteFinanciera = useCallback((fuente) => {
     setEstado((prev) => ({ ...prev, fuenteFinanciera: fuente }));
   }, []);
 
-  /** Agrega un logro reciente al inicio de la lista (para eventos del OS). */
+  /**
+   * Importa transacciones reales (CSV/Excel/Fintoc) al Copiloto Financiero.
+   * Deduplica por fecha+monto+descripción y actualiza la fuente y el estado.
+   */
+  const importarTransacciones = useCallback((nuevas = [], meta = {}) => {
+    setEstado((prev) => {
+      const clave = (t) => `${t.fecha}|${t.monto}|${(t.descripcion || '').slice(0, 40)}`;
+      const existentes = new Set(prev.transacciones.map(clave));
+      const agregadas = nuevas
+        .filter((t) => !existentes.has(clave(t)))
+        .map((t, i) => ({ id: t.id || `tx-${Date.now()}-${i}`, fecha: t.fecha, monto: Number(t.monto) || 0, descripcion: t.descripcion || 'Movimiento' }));
+      return {
+        ...prev,
+        transacciones: [...prev.transacciones, ...agregadas],
+        fuenteFinanciera: meta.fuente || prev.fuenteFinanciera || 'manual',
+        cuentasBancarias: meta.cuentas || prev.cuentasBancarias,
+        fintoc: meta.fintoc ? { ...prev.fintoc, ...meta.fintoc } : prev.fintoc,
+      };
+    });
+  }, []);
+
+  const setFintoc = useCallback((patch) => {
+    setEstado((prev) => ({ ...prev, fintoc: { ...prev.fintoc, ...patch } }));
+  }, []);
+
+  /** Desconecta la fuente financiera y limpia los datos importados. */
+  const limpiarFinanzas = useCallback(() => {
+    setEstado((prev) => ({
+      ...prev,
+      fuenteFinanciera: null,
+      transacciones: [],
+      cuentasBancarias: [],
+      fintoc: { conectado: false, banco: '', cuentas: 0, ultimaSync: null, linkToken: null },
+    }));
+  }, []);
+
   const agregarLogro = useCallback((titulo, icono = '✨') => {
     setEstado((prev) => ({
       ...prev,
@@ -231,13 +248,43 @@ export function PreparacionProvider({ children }) {
     }));
   }, []);
 
-  /** Reinicia el estado a los valores de fábrica (útil para la demo en vivo). */
+  // ── Equipo ──────────────────────────────────────────────
+  const asegurarOwner = useCallback((nombre, email) => {
+    setEstado((prev) => {
+      if (prev.miembros.some((m) => m.rol === 'Owner')) return prev;
+      return {
+        ...prev,
+        miembros: [{ id: 'owner', nombre: nombre || 'Fundador/a', email: email || '', rol: 'Owner', estado: 'activo' }, ...prev.miembros],
+      };
+    });
+  }, []);
+
+  const invitarMiembro = useCallback((email, rol = 'Employee') => {
+    setEstado((prev) => ({
+      ...prev,
+      invitaciones: [{ id: `inv-${Date.now()}`, email, rol, estado: 'pendiente' }, ...prev.invitaciones],
+    }));
+  }, []);
+
+  const cancelarInvitacion = useCallback((id) => {
+    setEstado((prev) => ({ ...prev, invitaciones: prev.invitaciones.filter((i) => i.id !== id) }));
+  }, []);
+
+  const eliminarMiembro = useCallback((id) => {
+    setEstado((prev) => ({ ...prev, miembros: prev.miembros.filter((m) => m.id !== id || m.rol === 'Owner') }));
+  }, []);
+
+  const setNotificaciones = useCallback((activas) => {
+    setEstado((prev) => ({ ...prev, notificacionesActivas: activas }));
+  }, []);
+
   const reiniciar = useCallback(() => setEstado(ESTADO_INICIAL), []);
 
   const value = useMemo(
     () => ({
       ...estado,
-      empresa: estado.perfil?.nombre || estado.empresa,
+      empresa: estado.perfil?.nombre || '',
+      dimensiones,
       nivel,
       mentorDesbloqueado,
       objetivos,
@@ -246,20 +293,31 @@ export function PreparacionProvider({ children }) {
       completarRecomendacion,
       completarDemoFinanciera,
       actualizarPerfil,
+      setFundadora,
       subirDocumento,
       setEstadoDocumento,
       renombrarDocumento,
       eliminarDocumento,
       alternarTarea,
       setFuenteFinanciera,
+      importarTransacciones,
+      setFintoc,
+      limpiarFinanzas,
       agregarLogro,
+      asegurarOwner,
+      invitarMiembro,
+      cancelarInvitacion,
+      eliminarMiembro,
+      setNotificaciones,
       reiniciar,
     }),
     [
-      estado, nivel, mentorDesbloqueado, objetivos, gaps, bonusPreparacion,
-      completarRecomendacion, completarDemoFinanciera, actualizarPerfil,
+      estado, dimensiones, nivel, mentorDesbloqueado, objetivos, gaps, bonusPreparacion,
+      completarRecomendacion, completarDemoFinanciera, actualizarPerfil, setFundadora,
       subirDocumento, setEstadoDocumento, renombrarDocumento, eliminarDocumento,
-      alternarTarea, setFuenteFinanciera, agregarLogro, reiniciar,
+      alternarTarea, setFuenteFinanciera, importarTransacciones, setFintoc, limpiarFinanzas,
+      agregarLogro, asegurarOwner, invitarMiembro,
+      cancelarInvitacion, eliminarMiembro, setNotificaciones, reiniciar,
     ]
   );
 

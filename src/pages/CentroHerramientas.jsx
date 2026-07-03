@@ -7,6 +7,7 @@ import EvidenceVaultModal from '../components/os/EvidenceVaultModal.jsx';
 import GapAnalysisModal from '../components/os/GapAnalysisModal.jsx';
 import RoadmapModal from '../components/os/RoadmapModal.jsx';
 import AIDiscoveryModal from '../components/os/AIDiscoveryModal.jsx';
+import MarketingCopilotModal from '../components/os/MarketingCopilotModal.jsx';
 
 const GRATUITAS = [
   { id: 'ai-discovery', nombre: 'AI Discovery', emoji: '🧠', estado: 'Nuevo', desc: 'La IA analiza tu evidencia y arma tu perfil conversando contigo.', accion: 'ai-discovery' },
@@ -18,9 +19,9 @@ const GRATUITAS = [
 ];
 
 const PREMIUM = [
-  { id: 'fin', nombre: 'Copiloto Financiero IA', emoji: '🤖', desc: 'Visibilidad financiera automática, alertas inteligentes y proyecciones.', mejora: 18, badge: 'Suscripción', proximamente: false, ruta: '/copiloto' },
+  { id: 'fin', nombre: 'Copiloto Financiero IA', emoji: '🤖', desc: 'Visibilidad financiera automática, alertas inteligentes y proyecciones.', mejora: 18, badge: 'Piloto gratis', proximamente: false, ruta: '/copiloto' },
   { id: 'com', nombre: 'Copiloto Comercial IA', emoji: '📈', desc: 'Optimiza tu pipeline, conversión y estrategia de ventas con IA.', mejora: 12, badge: 'Suscripción', proximamente: true },
-  { id: 'mkt', nombre: 'Copiloto Marketing IA', emoji: '🎯', desc: 'Analiza canales, CAC y campañas para crecer con eficiencia.', mejora: 10, badge: 'Suscripción', proximamente: true },
+  { id: 'mkt', nombre: 'Copiloto Marketing IA', emoji: '🎯', desc: 'ROAS, canales, presupuesto e insights de marketing con IA.', mejora: 10, badge: 'Piloto gratis', proximamente: false, accion: 'marketing' },
   { id: 'inv', nombre: 'Copiloto Inversión IA', emoji: '💼', desc: 'Prepara tu ronda con métricas y reportes listos para inversionistas.', mejora: 14, badge: 'Suscripción', proximamente: true },
   { id: 'ops', nombre: 'Copiloto Operaciones IA', emoji: '⚙️', desc: 'Automatiza procesos operativos y reduce trabajo administrativo.', mejora: 9, badge: 'Suscripción', proximamente: true },
 ];
@@ -53,9 +54,14 @@ function ToolGratuita({ t, onOpen }) {
   );
 }
 
-function ToolPremium({ t }) {
+function ToolPremium({ t, onOpen }) {
   const navigate = useNavigate();
   const disponible = !t.proximamente;
+  const abrir = () => {
+    if (!disponible) return;
+    if (t.accion) onOpen(t.accion);
+    else if (t.ruta) navigate(t.ruta);
+  };
   return (
     <div
       className={`premium-glow group relative flex flex-col rounded-3xl border p-5 transition ${
@@ -63,7 +69,7 @@ function ToolPremium({ t }) {
           ? 'cursor-pointer border-premium-100 bg-gradient-to-b from-premium-50/60 to-white duration-[180ms] hover:-translate-y-0.5 hover:shadow-xl animate-glowPulse'
           : 'border-slate-100 bg-white'
       }`}
-      onClick={() => disponible && navigate(t.ruta)}
+      onClick={abrir}
     >
       <div className="flex items-center justify-between">
         <span className={`grid h-11 w-11 place-items-center rounded-2xl text-xl ${disponible ? 'bg-premium-100' : 'bg-slate-50'}`}>{t.emoji}</span>
@@ -120,7 +126,7 @@ export default function CentroHerramientas() {
             <span className="rounded-full bg-premium-50 px-2.5 py-0.5 text-xs font-semibold text-premium">Copilotos IA</span>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {PREMIUM.map((t) => <ToolPremium key={t.id} t={t} />)}
+            {PREMIUM.map((t) => <ToolPremium key={t.id} t={t} onOpen={setModal} />)}
           </div>
         </section>
 
@@ -134,6 +140,7 @@ export default function CentroHerramientas() {
       {modal === 'evidence' && <EvidenceVaultModal onClose={() => setModal(null)} />}
       {modal === 'gap' && <GapAnalysisModal onClose={() => setModal(null)} onAbrirHerramienta={(a) => setModal(a)} />}
       {modal === 'roadmap' && <RoadmapModal onClose={() => setModal(null)} onAbrirHerramienta={(a) => setModal(a)} />}
+      {modal === 'marketing' && <MarketingCopilotModal onClose={() => setModal(null)} />}
     </AppLayout>
   );
 }

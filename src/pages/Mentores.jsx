@@ -1,57 +1,54 @@
 import AppLayout from '../components/os/AppLayout.jsx';
-import MentorBanner from '../components/os/MentorBanner.jsx';
 import { usePreparacion } from '../context/PreparacionContext.jsx';
-
-const MENTORES = [
-  { id: 'm1', nombre: 'Andrea Soto', rol: 'Ex-CFO, fintech', match: 94, tags: ['Finanzas', 'Fundraising'], emoji: '👩‍💼' },
-  { id: 'm2', nombre: 'Cristóbal Reyes', rol: 'Founder e-commerce', match: 91, tags: ['Go-to-market', 'Retail / DTC'], emoji: '🍷' },
-  { id: 'm3', nombre: 'María José Lillo', rol: 'Head of Growth', match: 88, tags: ['Comercial', 'Escalamiento'], emoji: '🚀' },
-];
+import { completitudPerfil } from '../data/profileSchema.js';
 
 export default function Mentores() {
-  const { mentorDesbloqueado, empresa } = usePreparacion();
+  const { perfil } = usePreparacion();
+  const completitud = completitudPerfil(perfil);
+  const listoParaRevision = completitud >= 40;
 
   return (
     <AppLayout>
       <div className="space-y-6">
         <header className="animate-fadeInUp">
-          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">Mentores</h1>
-          <p className="text-slate-500">Conecta con mentores afines a la etapa de {empresa}.</p>
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">Mentor Matching</h1>
+          <p className="text-slate-500">Open Beauchef revisa tu perfil y te asigna el mentor adecuado.</p>
         </header>
 
-        <MentorBanner />
+        <section className="overflow-hidden rounded-3xl border border-slate-100 bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto grid h-20 w-20 place-items-center rounded-3xl bg-premium-50 text-4xl animate-floaty">🧭</div>
 
-        {mentorDesbloqueado ? (
-          <div className="grid gap-4 sm:grid-cols-3">
-            {MENTORES.map((m) => (
-              <div key={m.id} className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm transition duration-[180ms] hover:-translate-y-0.5 hover:shadow-lg">
-                <div className="flex items-center justify-between">
-                  <span className="grid h-12 w-12 place-items-center rounded-2xl bg-slate-50 text-2xl">{m.emoji}</span>
-                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-600">{m.match}% match</span>
-                </div>
-                <p className="mt-3 font-bold text-slate-800">{m.nombre}</p>
-                <p className="text-sm text-slate-500">{m.rol}</p>
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {m.tags.map((t) => (
-                    <span key={t} className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand">{t}</span>
-                  ))}
-                </div>
-                <button className="mt-4 w-full rounded-xl bg-slate-900 py-2 text-sm font-semibold text-white transition hover:bg-slate-700">
-                  Solicitar reunión
-                </button>
+          {listoParaRevision ? (
+            <>
+              <div className="mx-auto mt-5 inline-flex items-center gap-2 rounded-full bg-amber-50 px-4 py-1.5 text-sm font-bold text-amber-700">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500" /> En revisión
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-10 text-center">
-            <p className="text-4xl">🔒</p>
-            <p className="mt-3 font-bold text-slate-800">Aquí aparecerán tus próximos mentores</p>
-            <p className="mx-auto mt-1 max-w-md text-sm text-slate-600">
-              Sigue sumando puntos a tu Nivel de Preparación. Cuando llegues al hito, te presentamos mentores
-              elegidos por IA según la etapa y la industria de Decantopia.
-            </p>
-          </div>
-        )}
+              <h2 className="mt-4 text-xl font-extrabold text-slate-900">Tu perfil está siendo revisado</h2>
+              <p className="mx-auto mt-2 max-w-md text-sm text-slate-600">
+                Una vez que Open Beauchef evalúe tu Startup Profile, recibirás la asignación de tu mentor.
+                Te avisaremos apenas esté listo.
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="mx-auto mt-5 inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-1.5 text-sm font-bold text-slate-500">
+                Perfil incompleto
+              </div>
+              <h2 className="mt-4 text-xl font-extrabold text-slate-900">Completa tu perfil para enviarlo a revisión</h2>
+              <p className="mx-auto mt-2 max-w-md text-sm text-slate-600">
+                Mientras más completo esté tu Startup Profile, mejor será tu match. Vas en un {completitud}%.
+                Usa <b>AI Discovery</b> o tu <b>Startup Card</b> para avanzar.
+              </p>
+              <div className="mx-auto mt-4 h-2 max-w-sm overflow-hidden rounded-full bg-slate-100">
+                <div className="h-full rounded-full bg-gradient-to-r from-premium to-brand" style={{ width: `${completitud}%`, transition: 'width 0.6s ease' }} />
+              </div>
+            </>
+          )}
+        </section>
+
+        <p className="text-center text-xs text-slate-400">
+          El match de mentores es evaluado por el equipo de Open Beauchef. No generamos asignaciones automáticas.
+        </p>
       </div>
     </AppLayout>
   );

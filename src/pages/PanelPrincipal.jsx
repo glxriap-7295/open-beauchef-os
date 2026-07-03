@@ -47,7 +47,7 @@ function ResumenStartup() {
     <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg font-extrabold text-slate-900">{perfil.nombre}</h2>
+          <h2 className="text-lg font-extrabold text-slate-900">{perfil.nombre || 'Tu startup'}</h2>
           <p className="text-sm text-slate-500">Perfil de tu startup · {pct}% completo</p>
         </div>
         <Link
@@ -108,9 +108,11 @@ export default function PanelPrincipal() {
         {/* Saludo */}
         <header className="animate-fadeInUp">
           <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
-            ¡Hola, {fundadora}! 👋
+            ¡Hola{fundadora ? `, ${fundadora}` : ''}! 👋
           </h1>
-          <p className="text-slate-500">Así va {empresa} hoy. Tu plataforma está trabajando contigo.</p>
+          <p className="text-slate-500">
+            {empresa ? `Así va ${empresa} hoy.` : 'Construyamos el perfil de tu startup.'} Tu plataforma está trabajando contigo.
+          </p>
         </header>
 
         {/* Hero: Nivel de Preparación */}

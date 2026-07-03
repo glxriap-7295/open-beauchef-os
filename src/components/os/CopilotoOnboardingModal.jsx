@@ -30,9 +30,9 @@ export default function CopilotoOnboardingModal({ onVolver }) {
             </div>
           </div>
           <p className="mt-5 max-w-xl text-sm leading-relaxed text-gray-700">
-            Esta demostración utiliza información financiera histórica de Decantopia para mostrar el
-            funcionamiento del Copiloto. En la versión final, toda esta información se obtendrá automáticamente
-            mediante Open Banking (Fintoc), IA y WhatsApp.
+            Esta demostración utiliza un dataset financiero histórico para mostrar el funcionamiento del
+            Copiloto. En la versión final, toda esta información se obtendrá automáticamente mediante Open
+            Banking (Fintoc), IA y WhatsApp.
           </p>
         </div>
 

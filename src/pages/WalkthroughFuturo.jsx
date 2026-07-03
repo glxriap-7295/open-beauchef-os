@@ -159,7 +159,7 @@ function Screen4() {
         </div>
         <div className="space-y-2 p-3">
           <div className="max-w-[85%] rounded-xl rounded-tl-sm bg-white p-2.5 text-sm text-slate-700 shadow">
-            Hola Paloma 👋 Detectamos un movimiento por <b>CLP 82.000</b>. ¿Podrías decirnos a qué corresponde?
+            Hola 👋 Detectamos un movimiento por <b>CLP 82.000</b>. ¿Podrías decirnos a qué corresponde?
           </div>
 
           {!resp ? (

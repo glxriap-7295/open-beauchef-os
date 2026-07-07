@@ -36,3 +36,31 @@ export async function listStartups() {
   const q = await getDocs(collection(db, 'startups'));
   return q.docs.map((d) => ({ uid: d.id, ...d.data() }));
 }
+
+/**
+ * Asignación de mentor (decisión del admin). Se guarda en `asignaciones/{uid}`
+ * para que el emprendedor la vea, sin darle permiso de escritura sobre ella.
+ */
+export async function assignMentor(uid, mentor, adminEmail) {
+  if (!db || !uid) return;
+  await setDoc(doc(db, 'asignaciones', uid), {
+    mentor: { id: mentor.id, nombre: mentor.nombre, foto: mentor.foto, bio: mentor.bio, linkedin: mentor.linkedin },
+    asignadoPor: adminEmail || '',
+    asignadoEl: Date.now(),
+  }, { merge: true });
+}
+
+/** Lee la asignación de mentor de un emprendedor (o null). */
+export async function loadAsignacion(uid) {
+  if (!db || !uid) return null;
+  const snap = await getDoc(doc(db, 'asignaciones', uid));
+  return snap.exists() ? snap.data() : null;
+}
+
+/** Lista todas las asignaciones (para el dashboard de mentores). */
+export async function listAsignaciones() {
+  if (!db) return [];
+  const q = await getDocs(collection(db, 'asignaciones'));
+  return q.docs.map((d) => ({ uid: d.id, ...d.data() }));
+}
+

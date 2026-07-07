@@ -188,8 +188,9 @@ function TabIntegraciones() {
 
 /* ── Notificaciones ── */
 function TabNotificaciones() {
-  const { notificacionesActivas, setNotificaciones } = usePreparacion();
+  const { notificacionesActivas, setNotificaciones, voiceMode, setVoiceMode, setTourVisto } = usePreparacion();
   const [permiso, setPermiso] = useState(notifications.permiso());
+  const soportaVoz = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
 
   const alternar = async () => {
     if (!notificacionesActivas) {
@@ -226,6 +227,36 @@ function TabNotificaciones() {
             <li key={e} className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600"><span className="text-emerald-500">✓</span> {e}</li>
           ))}
         </ul>
+      </div>
+
+      {/* Modo voz */}
+      <div className="flex items-center justify-between rounded-2xl border border-slate-100 p-4">
+        <div>
+          <p className="text-sm font-bold text-slate-800">Modo voz 🎙️</p>
+          <p className="text-xs text-slate-500">{soportaVoz ? 'Dicta tus respuestas en AI Discovery con el micrófono.' : 'Tu navegador no soporta dictado por voz.'}</p>
+        </div>
+        <button
+          onClick={() => setVoiceMode(!voiceMode)}
+          disabled={!soportaVoz}
+          className={`relative h-7 w-12 rounded-full transition ${voiceMode && soportaVoz ? 'bg-brand' : 'bg-slate-300'} disabled:opacity-50`}
+          aria-label="Activar modo voz"
+        >
+          <span className={`absolute top-1 h-5 w-5 rounded-full bg-white transition ${voiceMode && soportaVoz ? 'left-6' : 'left-1'}`} />
+        </button>
+      </div>
+
+      {/* Repetir tour */}
+      <div className="flex items-center justify-between rounded-2xl border border-slate-100 p-4">
+        <div>
+          <p className="text-sm font-bold text-slate-800">Tour de la plataforma</p>
+          <p className="text-xs text-slate-500">Vuelve a ver la guía interactiva de bienvenida.</p>
+        </div>
+        <button
+          onClick={() => setTourVisto(false)}
+          className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+        >
+          Repetir tour
+        </button>
       </div>
     </div>
   );

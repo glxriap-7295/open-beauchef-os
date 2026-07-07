@@ -40,6 +40,11 @@ const ESTADO_INICIAL = {
   fintoc: { conectado: false, banco: '', cuentas: 0, ultimaSync: null, linkToken: null },
   copilotoActivado: false,
   umbralMentor: 70,
+  // Preferencias de experiencia
+  voiceMode: true,
+  tourVisto: false,
+  // Mentor Matching (lo asigna el equipo admin)
+  mentorAsignado: null, // { nombre, foto, asignadoEl }
 };
 
 function clamp(n, lo, hi) {
@@ -278,6 +283,10 @@ export function PreparacionProvider({ children }) {
     setEstado((prev) => ({ ...prev, notificacionesActivas: activas }));
   }, []);
 
+  const setVoiceMode = useCallback((v) => setEstado((prev) => ({ ...prev, voiceMode: v })), []);
+  const setTourVisto = useCallback((v) => setEstado((prev) => ({ ...prev, tourVisto: v })), []);
+  const setMentorAsignado = useCallback((mentor) => setEstado((prev) => ({ ...prev, mentorAsignado: mentor })), []);
+
   /** Reemplaza el estado con uno traído de la nube (Firestore). No-op si vacío. */
   const hidratar = useCallback((nuevo) => {
     if (!nuevo || typeof nuevo !== 'object') return;
@@ -320,6 +329,9 @@ export function PreparacionProvider({ children }) {
       cancelarInvitacion,
       eliminarMiembro,
       setNotificaciones,
+      setVoiceMode,
+      setTourVisto,
+      setMentorAsignado,
       hidratar,
       estadoRaw: estado,
       reiniciar,
@@ -330,7 +342,8 @@ export function PreparacionProvider({ children }) {
       subirDocumento, setEstadoDocumento, renombrarDocumento, eliminarDocumento,
       alternarTarea, setFuenteFinanciera, importarTransacciones, setFintoc, limpiarFinanzas,
       agregarLogro, asegurarOwner, invitarMiembro,
-      cancelarInvitacion, eliminarMiembro, setNotificaciones, hidratar, reiniciar,
+      cancelarInvitacion, eliminarMiembro, setNotificaciones, setVoiceMode, setTourVisto,
+      setMentorAsignado, hidratar, reiniciar,
     ]
   );
 

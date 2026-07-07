@@ -1,14 +1,16 @@
 import { mockProvider } from './mockProvider.js';
 import { ollamaProvider } from './ollamaProvider.js';
+import { claudeProvider } from './claudeProvider.js';
 
 /**
- * Registro de proveedores de IA. Para agregar Claude / OpenAI / Gemini en el
- * futuro, basta con crear otro módulo que implemente la misma interfaz
- * (analyzeEvidence, nextQuestion, chat, disponible) y registrarlo aquí. La UI
- * nunca cambia.
+ * Registro de proveedores de IA. Para agregar OpenAI / Gemini / DeepSeek /
+ * Mistral, crea un módulo con la misma interfaz (analyzeEvidence, nextQuestion,
+ * chat, disponible) y añádelo a este objeto: una línea, sin tocar la UI.
+ * Se elige con VITE_AI_PROVIDER; si falla, el SmartProvider cae al mock.
  */
 const PROVIDERS = {
   ollama: ollamaProvider,
+  claude: claudeProvider,
   mock: mockProvider,
 };
 

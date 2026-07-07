@@ -128,13 +128,25 @@ service cloud.firestore {
       return request.auth != null &&
         request.auth.token.email in ['jefe@openbeauchef.cl'];
     }
+    function esMentor() {
+      return request.auth != null &&
+        request.auth.token.email in ['mentor@openbeauchef.cl'];
+    }
+    // Datos de cada startup: dueño escribe; admin y mentores leen.
     match /startups/{uid} {
-      allow read: if request.auth != null && (request.auth.uid == uid || esAdmin());
+      allow read: if request.auth != null && (request.auth.uid == uid || esAdmin() || esMentor());
       allow write: if request.auth != null && request.auth.uid == uid;
+    }
+    // Asignaciones de mentor: solo admin escribe; dueño/admin/mentor leen.
+    match /asignaciones/{uid} {
+      allow read: if request.auth != null && (request.auth.uid == uid || esAdmin() || esMentor());
+      allow write: if esAdmin();
     }
   }
 }
 ```
+> Reemplaza los emails de `esAdmin()` y `esMentor()` por los reales, y define
+> `VITE_ADMIN_EMAILS` y `VITE_MENTOR_EMAILS` con los mismos valores.
 
 Con esto: las 2 emprendedoras entran desde cualquier dispositivo y ven su
 información; tu jefe entra con su email admin y ve el panel `/admin` con todas.

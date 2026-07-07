@@ -4,11 +4,12 @@ import { usePreparacion } from '../../context/PreparacionContext.jsx';
 import { getAIProvider } from '../../services/ai/index.js';
 import { notifications, NotificationEvents } from '../../services/notifications/index.js';
 import { TIPOS_EVIDENCIA, completitudPerfil } from '../../data/profileSchema.js';
+import { useSpeechToText } from '../../hooks/useSpeechToText.js';
 
 export default function AIDiscoveryModal({ onClose }) {
   const {
     perfil, documentos, subirDocumento, setEstadoDocumento,
-    actualizarPerfil, agregarLogro, notificacionesActivas,
+    actualizarPerfil, agregarLogro, notificacionesActivas, voiceMode,
   } = usePreparacion();
   const avisar = (evento) => { if (notificacionesActivas) notifications.emitir(evento); };
 
@@ -24,6 +25,9 @@ export default function AIDiscoveryModal({ onClose }) {
   const contenidosRef = useRef({}); // id -> texto extraído (para Ollama)
   const fileRef = useRef(null);
   const scrollRef = useRef(null);
+
+  // Voz: dicta tu respuesta (Web Speech API, gratis).
+  const voz = useSpeechToText({ onResult: (t) => setInput(t) });
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -89,13 +93,14 @@ export default function AIDiscoveryModal({ onClose }) {
     setMensajes(historia);
 
     // Guarda la respuesta en el Startup Profile.
+    const campoRespondido = campoActual;
     if (campoActual) {
       perfilRef.current = { ...perfilRef.current, [campoActual]: texto };
       actualizarPerfil({ [campoActual]: texto });
     }
 
     setPensando(true);
-    const q = await ai.nextQuestion(perfilRef.current, historia);
+    const q = await ai.nextQuestion(perfilRef.current, historia, campoRespondido);
     setPensando(false);
 
     if (!q) {
@@ -127,11 +132,29 @@ export default function AIDiscoveryModal({ onClose }) {
             onSubmit={(e) => { e.preventDefault(); responder(); }}
             className="flex items-center gap-2"
           >
+            {voz.soportado && voiceMode && (
+              <button
+                type="button"
+                onClick={voz.toggle}
+                title={voz.escuchando ? 'Detener' : 'Hablar'}
+                aria-label="Dictar por voz"
+                className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl border transition ${
+                  voz.escuchando
+                    ? 'animate-pulse border-rose-200 bg-rose-50 text-rose-600'
+                    : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                  <path d="M19 11a7 7 0 0 1-14 0M12 18v3" />
+                </svg>
+              </button>
+            )}
             <input
               autoFocus
-              value={input}
+              value={voz.escuchando ? voz.transcript : input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Escribe tu respuesta…"
+              placeholder={voz.escuchando ? 'Escuchando…' : 'Escribe o habla tu respuesta…'}
               className="flex-1 rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
             />
             <button

@@ -15,6 +15,7 @@ import WalkthroughFuturo from './pages/WalkthroughFuturo.jsx';
 import Mentores from './pages/Mentores.jsx';
 import Configuracion from './pages/Configuracion.jsx';
 import Admin from './pages/Admin.jsx';
+import MentorDashboard from './pages/MentorDashboard.jsx';
 
 function Privada({ children }) {
   return <ProtectedRoute>{children}</ProtectedRoute>;
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="/mentores" element={<Privada><Mentores /></Privada>} />
           <Route path="/configuracion" element={<Privada><Configuracion /></Privada>} />
           <Route path="/admin" element={<Privada><Admin /></Privada>} />
+          <Route path="/mentor" element={<Privada><MentorDashboard /></Privada>} />
 
           {/* Copiloto Financiero IA */}
           <Route path="/copiloto" element={<Privada><CopilotoFinanciero /></Privada>} />

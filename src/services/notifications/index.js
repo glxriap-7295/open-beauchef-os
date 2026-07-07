@@ -54,6 +54,16 @@ export const NotificationEvents = {
     cuerpo: `Detectamos un movimiento por ${monto} que requiere clasificación.`,
     tag: 'gasto',
   }),
+  mentorAsignado: (nombre) => ({
+    titulo: 'Te asignaron un mentor 🎉',
+    cuerpo: `${nombre} acompañará a tu startup. Revisa la sección Mentores.`,
+    tag: 'mentor',
+  }),
+  anomaliaFinanciera: (detalle) => ({
+    titulo: 'Anomalía financiera detectada 📊',
+    cuerpo: detalle || 'Revisa tus movimientos: hay algo fuera de lo habitual.',
+    tag: 'finanzas',
+  }),
 };
 
 export const notifications = {

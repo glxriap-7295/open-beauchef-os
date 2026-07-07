@@ -1,11 +1,44 @@
+import { useEffect, useState } from 'react';
 import AppLayout from '../components/os/AppLayout.jsx';
 import { usePreparacion } from '../context/PreparacionContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 import { completitudPerfil } from '../data/profileSchema.js';
+import { firebaseHabilitado } from '../services/firebase/app.js';
+import { loadAsignacion } from '../services/firebase/data.js';
 
 export default function Mentores() {
   const { perfil } = usePreparacion();
+  const { user } = useAuth();
   const completitud = completitudPerfil(perfil);
   const listoParaRevision = completitud >= 40;
+  const [asignacion, setAsignacion] = useState(null);
+
+  useEffect(() => {
+    if (!firebaseHabilitado() || !user?.id) return;
+    let vivo = true;
+    loadAsignacion(user.id).then((a) => { if (vivo) setAsignacion(a); }).catch(() => {});
+    return () => { vivo = false; };
+  }, [user?.id]);
+
+  if (asignacion?.mentor) {
+    const m = asignacion.mentor;
+    return (
+      <AppLayout>
+        <div className="space-y-6">
+          <header className="animate-fadeInUp">
+            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">Tu mentor</h1>
+            <p className="text-slate-500">El equipo de Open Beauchef revisó tu perfil y te asignó un mentor.</p>
+          </header>
+          <section className="rounded-3xl border border-emerald-200 bg-emerald-50/50 p-8 text-center shadow-sm">
+            <div className="mx-auto grid h-20 w-20 place-items-center rounded-3xl bg-white text-4xl shadow-sm">{m.foto || '🧑‍🏫'}</div>
+            <h2 className="mt-4 text-xl font-extrabold text-slate-900">{m.nombre}</h2>
+            {m.bio && <p className="mx-auto mt-2 max-w-md text-sm text-slate-600">{m.bio}</p>}
+            {m.linkedin && <a href={m.linkedin} target="_blank" rel="noreferrer" className="mt-4 inline-block rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-slate-700">Ver perfil de LinkedIn</a>}
+          </section>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>

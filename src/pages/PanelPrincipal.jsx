@@ -3,6 +3,7 @@ import AppLayout from '../components/os/AppLayout.jsx';
 import NivelPreparacion from '../components/os/NivelPreparacion.jsx';
 import RecomendacionesIA from '../components/os/RecomendacionesIA.jsx';
 import MentorBanner from '../components/os/MentorBanner.jsx';
+import PlatformTour from '../components/os/PlatformTour.jsx';
 import { usePreparacion } from '../context/PreparacionContext.jsx';
 
 function Logros() {
@@ -104,6 +105,7 @@ export default function PanelPrincipal() {
 
   return (
     <AppLayout>
+      <PlatformTour />
       <div className="space-y-6">
         {/* Saludo */}
         <header className="animate-fadeInUp">

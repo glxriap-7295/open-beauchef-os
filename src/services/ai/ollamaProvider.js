@@ -51,25 +51,31 @@ export const ollamaProvider = {
       .map((d) => `— ${d.nombre} (${d.tipo})${d.contenido ? `\nContenido:\n${d.contenido}` : ''}`)
       .join('\n\n') || '(sin documentos)';
     const campos = PROFILE_FIELDS.map((f) => `${f.key} (${f.label})`).join(', ');
-    const prompt = `Eres un analista de startups. Extrae la mayor cantidad de información posible desde estos ` +
-      `documentos:\n\n${lista}\n\nPerfil actual (JSON): ${JSON.stringify(perfil)}\n\n` +
+    const prompt = `Eres un asesor cercano de startups de Open Beauchef (español chileno, cálido y humano). ` +
+      `Lee y entiende estos documentos:\n\n${lista}\n\nPerfil actual (JSON): ${JSON.stringify(perfil)}\n\n` +
       `Campos posibles: ${campos}.\n` +
-      `Devuelve SOLO un JSON válido con la forma {"detectados": {campo: valor}, "resumen": "texto breve en español"}. ` +
-      `Incluye en "detectados" únicamente campos que aparezcan o se infieran claramente del contenido y que hoy ` +
-      `estén vacíos en el perfil. No inventes datos que no estén en los documentos.`;
+      `Devuelve SOLO un JSON válido con la forma {"detectados": {campo: valor}, "resumen": "texto"}.\n` +
+      `- "detectados": solo campos que aparezcan o se infieran claramente del contenido y que hoy estén vacíos. No inventes.\n` +
+      `- "resumen": 2-3 frases cálidas que le DEVUELVAN al fundador lo que entendiste de su negocio, ` +
+      `empezando con "Perfecto. Revisé la información que compartiste y entendí que...". Suena como un asesor, no como un formulario.`;
     const raw = await generar(prompt, { json: true });
     const parsed = JSON.parse(raw);
     return { detectados: parsed.detectados || {}, resumen: parsed.resumen || 'Análisis completado.' };
   },
 
-  async nextQuestion(perfil = {}, historia = []) {
+  async nextQuestion(perfil = {}, historia = [], ultimoCampo = null) {
     const faltantes = camposFaltantes(perfil);
     if (!faltantes.length) return null;
     const objetivo = faltantes[0];
     const previas = historia.map((h) => `${h.rol}: ${h.contenido}`).join('\n');
-    const prompt = `Eres un asesor de startups conversando (estilo ChatGPT, cálido, en español chileno). ` +
-      `Necesitas conocer el campo "${objetivo.label}". Conversación previa:\n${previas}\n\n` +
-      `Escribe UNA sola pregunta natural para obtener ese dato, sin repetir lo ya respondido. Solo la pregunta.`;
+    const puente = ultimoCampo
+      ? `Conecta de forma natural con lo último que te contó (sobre "${ultimoCampo}"), por ejemplo "Como me comentaste que...".`
+      : '';
+    const prompt = `Eres un asesor cercano de Open Beauchef (español chileno, cálido y alentador, nunca robótico). ` +
+      `Conversación previa:\n${previas}\n\n` +
+      `Ahora necesitas conocer "${objetivo.label}". ${puente} ` +
+      `Si el fundador va avanzando, felicítalo brevemente. Escribe UNA sola pregunta natural y humana, ` +
+      `sin repetir lo ya respondido. Devuelve solo la pregunta.`;
     const texto = await generar(prompt);
     return { campo: objetivo.key, pregunta: texto.trim() || objetivo.pregunta };
   },

@@ -12,7 +12,6 @@ export default function FinancialConnectGate({ onConectar, onDemo }) {
     { id: 'csv', icon: '📄', titulo: 'Subir CSV', desc: 'Importa tus movimientos desde un archivo CSV.', accion: onConectar },
     { id: 'excel', icon: '📊', titulo: 'Subir Excel', desc: 'Importa una planilla de movimientos.', accion: onConectar },
     { id: 'pdf', icon: '🧾', titulo: 'Subir cartola PDF', desc: 'Lectura de cartola en PDF. Próximamente.', proximamente: true },
-    { id: 'demo', icon: '✨', titulo: 'Cargar dataset de ejemplo', desc: 'Explora el Copiloto con datos históricos de demostración.', accion: onDemo, destacado: true },
   ];
 
   return (
@@ -52,10 +51,19 @@ export default function FinancialConnectGate({ onConectar, onDemo }) {
         ))}
       </div>
 
-      <p className="mt-6 rounded-2xl border border-amber-100 bg-amber-50/60 p-4 text-center text-sm text-amber-800">
-        Esta demostración utiliza información financiera histórica. Durante el piloto, la versión final
-        obtendrá y analizará tus datos financieros automáticamente.
+      <p className="mt-6 text-center text-sm text-slate-500">
+        Tus datos son privados y se usan solo para generar tus reportes.
       </p>
+
+      {/* Acción secundaria: cargar el dataset de ejemplo solo si el usuario lo elige. */}
+      <div className="mt-3 text-center">
+        <button
+          onClick={onDemo}
+          className="text-sm font-semibold text-slate-500 underline-offset-2 transition hover:text-brand hover:underline"
+        >
+          ¿Solo quieres explorar? Ver demostración con datos de ejemplo
+        </button>
+      </div>
     </div>
   );
 }

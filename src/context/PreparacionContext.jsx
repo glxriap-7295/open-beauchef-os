@@ -136,12 +136,16 @@ export function PreparacionProvider({ children }) {
     }));
   }, []);
 
-  /** Activa el Copiloto Financiero (walkthrough/demo). Sube Finanzas vía fuente. */
+  /**
+   * Marca como visto el recorrido del Copiloto Financiero (walkthrough).
+   * NO conecta datos: nunca carga automáticamente el dataset de ejemplo. La
+   * fuente financiera solo se establece cuando el fundador elige explícitamente
+   * conectar Fintoc / subir un archivo / ver la demostración.
+   */
   const completarDemoFinanciera = useCallback(() => {
     setEstado((prev) => ({
       ...prev,
       copilotoActivado: true,
-      fuenteFinanciera: prev.fuenteFinanciera || 'demo',
       recomendaciones: prev.recomendaciones.map((r) =>
         r.id === 'finanzas' || r.id === 'fuentes' ? { ...r, hecho: true } : r
       ),

@@ -19,7 +19,7 @@ const GRATUITAS = [
 ];
 
 const PREMIUM = [
-  { id: 'fin', nombre: 'Copiloto Financiero IA', emoji: '🤖', desc: 'Visibilidad financiera automática, alertas inteligentes y proyecciones.', mejora: 18, badge: 'Piloto gratis', proximamente: false, ruta: '/copiloto' },
+  { id: 'fin', nombre: 'Copiloto Financiero IA', emoji: '🤖', desc: 'Visibilidad financiera automática, alertas inteligentes y proyecciones.', mejora: 18, badge: 'Piloto gratis', proximamente: false, ruta: '/dashboard' },
   { id: 'com', nombre: 'Copiloto Comercial IA', emoji: '📈', desc: 'Optimiza tu pipeline, conversión y estrategia de ventas con IA.', mejora: 12, badge: 'Suscripción', proximamente: true },
   { id: 'mkt', nombre: 'Copiloto Marketing IA', emoji: '🎯', desc: 'ROAS, canales, presupuesto e insights de marketing con IA.', mejora: 10, badge: 'Piloto gratis', proximamente: false, accion: 'marketing' },
   { id: 'inv', nombre: 'Copiloto Inversión IA', emoji: '💼', desc: 'Prepara tu ronda con métricas y reportes listos para inversionistas.', mejora: 14, badge: 'Suscripción', proximamente: true },

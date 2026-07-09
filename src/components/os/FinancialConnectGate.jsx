@@ -28,7 +28,7 @@ export default function FinancialConnectGate({ onConectar, onDemo }) {
         {opciones.map((o) => (
           <button
             key={o.id}
-            onClick={() => !o.proximamente && o.accion?.()}
+            onClick={() => !o.proximamente && o.accion?.(o.id)}
             disabled={o.proximamente}
             className={`flex items-start gap-4 rounded-2xl border p-5 text-left transition duration-[180ms] ${
               o.proximamente
@@ -61,7 +61,7 @@ export default function FinancialConnectGate({ onConectar, onDemo }) {
           onClick={onDemo}
           className="text-sm font-semibold text-slate-500 underline-offset-2 transition hover:text-brand hover:underline"
         >
-          ¿Solo quieres explorar? Ver demostración con datos de ejemplo
+          Explorar ejemplo
         </button>
       </div>
     </div>

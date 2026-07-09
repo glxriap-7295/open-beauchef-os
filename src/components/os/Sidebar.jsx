@@ -78,7 +78,7 @@ export default function Sidebar({ onNavigate }) {
       <nav className="mt-6 flex-1 space-y-1">
         <Item to="/app" icon="inicio" end>Inicio</Item>
         <Item to="/herramientas" icon="herramientas">Centro de Herramientas</Item>
-        <Item to="/copiloto" icon="copiloto" badge="Nuevo">Copiloto Financiero IA</Item>
+        <Item to="/dashboard" icon="copiloto" badge="Nuevo">Copiloto Financiero IA</Item>
         <Item to="/mentores" icon="mentor" locked={!mentorDesbloqueado}>Mentores</Item>
         <Item to="/configuracion" icon="settings">Configuración</Item>
         {esAdmin(user?.email) && <Item to="/admin" icon="reportes" badge="Admin">Administración</Item>}

@@ -16,6 +16,7 @@ export default function DashboardPage() {
   const [aviso, setAviso] = useState(null);
   const [vista, setVista] = useState('mensual'); // 'mensual' | 'consolidado'
   const [conectarAbierto, setConectarAbierto] = useState(false);
+  const [metodoInicial, setMetodoInicial] = useState(null);
   const { fuenteFinanciera, setFuenteFinanciera, transacciones, fintoc } = usePreparacion();
   const esDemo = fuenteFinanciera === 'demo';
 
@@ -60,7 +61,7 @@ export default function DashboardPage() {
       <main className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
         {!fuenteFinanciera ? (
           <FinancialConnectGate
-            onConectar={() => setConectarAbierto(true)}
+            onConectar={(metodo) => { setMetodoInicial(metodo || 'manual'); setConectarAbierto(true); }}
             onDemo={() => setFuenteFinanciera('demo')}
           />
         ) : mesesDerivados.length === 0 ? (
@@ -71,7 +72,7 @@ export default function DashboardPage() {
               No encontramos transacciones en el período. Importa un archivo con movimientos o carga el dataset de ejemplo.
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
-              <button onClick={() => setConectarAbierto(true)} className="rounded-xl bg-brand px-4 py-2 text-sm font-bold text-white transition hover:bg-brand-dark">Importar datos</button>
+              <button onClick={() => { setMetodoInicial('manual'); setConectarAbierto(true); }} className="rounded-xl bg-brand px-4 py-2 text-sm font-bold text-white transition hover:bg-brand-dark">Importar datos</button>
               <button onClick={() => setFuenteFinanciera('demo')} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Cargar dataset de ejemplo</button>
             </div>
           </div>
@@ -95,7 +96,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
-                <button onClick={() => setConectarAbierto(true)} className="rounded-lg bg-premium px-3 py-2 text-sm font-semibold text-white transition hover:bg-premium-dark">Conectar mis datos</button>
+                <button onClick={() => { setMetodoInicial(null); setConectarAbierto(true); }} className="rounded-lg bg-premium px-3 py-2 text-sm font-semibold text-white transition hover:bg-premium-dark">Conectar mis datos</button>
                 <Link to="/herramientas" className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-700">← Centro de Herramientas</Link>
               </div>
             </div>
@@ -118,7 +119,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
-                <button onClick={() => setConectarAbierto(true)} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700">
+                <button onClick={() => { setMetodoInicial(fuenteFinanciera === 'fintoc' ? 'fintoc' : 'manual'); setConectarAbierto(true); }} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700">
                   {fuenteFinanciera === 'fintoc' ? 'Sincronizar' : 'Importar más'}
                 </button>
                 <Link to="/herramientas" className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-700">← Centro de Herramientas</Link>
@@ -146,7 +147,12 @@ export default function DashboardPage() {
         Copiloto Financiero · Dataset de demostración · datos históricos jun–nov 2025
       </footer>
 
-      {conectarAbierto && <ConectarDatosModal onClose={() => setConectarAbierto(false)} />}
+      {conectarAbierto && (
+        <ConectarDatosModal
+          metodoInicial={metodoInicial}
+          onClose={() => { setConectarAbierto(false); setMetodoInicial(null); }}
+        />
+      )}
     </div>
   );
 }

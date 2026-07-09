@@ -51,22 +51,18 @@ export const fintocProvider = {
   },
 
   /**
-   * Inicia el flujo de conexión. Requiere un widgetToken emitido por tu backend
-   * (con la secret key de Fintoc). Devuelve una promesa que resuelve al conectar.
-   * En este entorno de demo, si no hay backend, `disponible()` ya es false.
+   * Abre el widget oficial con el widget_token del Link Intent. Resuelve con el
+   * objeto Link Intent (que trae el exchange_token) al conectar con éxito.
    */
-  async conectar({ widgetToken, onSuccess, onExit } = {}) {
-    if (!this.disponible()) throw new Error(this.motivoNoDisponible());
+  async abrirWidget(widgetToken) {
     const Fintoc = await cargarWidget();
     return new Promise((resolve, reject) => {
       try {
         const widget = Fintoc.create({
           publicKey: PUBLIC_KEY,
-          holderType: 'business',
-          product: 'movements',
           widgetToken,
-          onSuccess: (link) => { onSuccess?.(link); resolve(link); },
-          onExit: () => { onExit?.(); reject(new Error('El usuario cerró el widget.')); },
+          onSuccess: (linkIntent) => resolve(linkIntent),
+          onExit: () => reject(new Error('Cerraste el widget de Fintoc.')),
         });
         widget.open();
       } catch (e) {
@@ -76,18 +72,44 @@ export const fintocProvider = {
   },
 
   /**
-   * Flujo completo real: abre el widget oficial, obtiene el link_token, y a
-   * través del backend serverless (secret key nunca en el front) importa
-   * cuentas + movimientos. Primera sync: últimos 90 días. Siguientes: solo
-   * nuevos desde la última sincronización (guardada por link).
+   * Flujo de producción completo (secret key NUNCA en el front):
+   *  1) backend crea Link Intent -> widget_token
+   *  2) widget oficial -> exchange_token
+   *  3) backend intercambia exchange_token -> link_token
+   *  4) cuentas + movimientos (primera sync: 90 días; luego solo nuevos)
    */
-  async conectarYSincronizar() {
+  async conectarYSincronizar({ holderType = 'business' } = {}) {
     if (!this.disponible()) throw new Error(this.motivoNoDisponible());
-    const link = await this.conectar({});
-    const linkToken = link?.id || link?.link_token || link;
-    if (!linkToken) throw new Error('Fintoc no devolvió un link válido.');
-
     const base = LINK_ENDPOINT.replace(/\/$/, '');
+
+    // 1) Link Intent -> widget_token
+    const liRes = await fetch(`${base}/link-intent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ holderType }),
+    });
+    const liData = await liRes.json().catch(() => ({}));
+    if (!liRes.ok || !liData.widget_token) {
+      throw new Error(liData.error || 'No se pudo iniciar la conexión con Fintoc.');
+    }
+
+    // 2) Widget -> exchange_token
+    const linkIntent = await this.abrirWidget(liData.widget_token);
+    const exchangeToken = linkIntent?.exchangeToken || linkIntent?.exchange_token;
+    if (!exchangeToken) throw new Error('Fintoc no devolvió un exchange_token.');
+
+    // 3) Exchange -> link_token
+    const exRes = await fetch(`${base}/exchange`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ exchange_token: exchangeToken }),
+    });
+    const exData = await exRes.json().catch(() => ({}));
+    if (!exRes.ok || !exData.link_token) {
+      throw new Error(exData.error || 'No se pudo completar la conexión con Fintoc.');
+    }
+    const linkToken = exData.link_token;
+
     const accRes = await fetch(`${base}/accounts?link_token=${encodeURIComponent(linkToken)}`);
     if (!accRes.ok) {
       const t = await accRes.json().catch(() => ({}));

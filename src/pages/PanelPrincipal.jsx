@@ -76,8 +76,8 @@ function ResumenStartup() {
 function AccesosRapidos() {
   const accesos = [
     { to: '/herramientas', titulo: 'Centro de Herramientas', desc: 'Explora todas tus herramientas', emoji: '🧰', color: 'bg-brand-50 text-brand' },
-    { to: '/copiloto', titulo: 'Copiloto Financiero IA', desc: 'Tu asistente financiero 24/7', emoji: '🤖', color: 'bg-premium-50 text-premium', badge: 'Nuevo' },
-    { to: '/copiloto/futuro', titulo: 'Ver versión futura', desc: 'Así funcionará todo automático', emoji: '✨', color: 'bg-amber-50 text-amber-600' },
+    { to: '/dashboard', titulo: 'Copiloto Financiero IA', desc: 'Conecta tu empresa y analiza tus finanzas', emoji: '🤖', color: 'bg-premium-50 text-premium', badge: 'Nuevo' },
+    { to: '/mentores', titulo: 'Mentores', desc: 'El equipo Open Beauchef revisa tu perfil', emoji: '🤝', color: 'bg-emerald-50 text-emerald-600' },
   ];
   return (
     <div className="grid gap-4 sm:grid-cols-3">

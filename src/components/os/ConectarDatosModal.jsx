@@ -1,17 +1,18 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ToolModal from './ToolModal.jsx';
 import { banking } from '../../services/banking/index.js';
 import { notifications, NotificationEvents } from '../../services/notifications/index.js';
 import { usePreparacion } from '../../context/PreparacionContext.jsx';
 import { formatCLP } from '../../utils/formatters.js';
 
-export default function ConectarDatosModal({ onClose }) {
+export default function ConectarDatosModal({ onClose, metodoInicial = null }) {
   const { agregarLogro, importarTransacciones, notificacionesActivas } = usePreparacion();
-  const [metodo, setMetodo] = useState(null); // 'fintoc' | 'manual'
+  const [metodo, setMetodo] = useState(metodoInicial === 'fintoc' ? 'fintoc' : (metodoInicial ? 'manual' : null));
   const [resultado, setResultado] = useState(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
   const fileRef = useRef(null);
+  const autoRef = useRef(false);
 
   const fintocOk = banking.openBankingDisponible();
 
@@ -63,6 +64,17 @@ export default function ConectarDatosModal({ onClose }) {
       e.target.value = '';
     }
   };
+
+  // Lanzamiento directo: si se abrió eligiendo "Conectar con Fintoc", abre el
+  // widget de inmediato (sin pedir de nuevo el método). Solo una vez.
+  useEffect(() => {
+    if (autoRef.current) return;
+    if (metodoInicial === 'fintoc' && fintocOk) {
+      autoRef.current = true;
+      conectarFintoc();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <ToolModal

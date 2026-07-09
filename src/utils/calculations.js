@@ -57,13 +57,24 @@ const CORTO_MES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep'
  * Resultado y Flujo de Caja. Los gastos van a "otros" (categoría genérica),
  * ya que un movimiento bancario crudo no trae desglose de COGS.
  */
+/** Convierte una fecha (ISO o DD/MM/YYYY, etc.) a "YYYY-MM" para agrupar. */
+function anioMes(valor) {
+  const s = String(valor || '').trim();
+  let m = s.match(/^(\d{4})[-/.](\d{1,2})/);            // YYYY-MM-...
+  if (m) return `${m[1]}-${String(m[2]).padStart(2, '0')}`;
+  m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/); // DD/MM/YYYY (Chile)
+  if (m) { const y = m[3].length === 2 ? `20${m[3]}` : m[3]; return `${y}-${String(m[2]).padStart(2, '0')}`; }
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  return null;
+}
+
 export function transaccionesAMeses(transacciones = []) {
   const porMes = new Map();
   for (const t of transacciones) {
-    const fecha = String(t.fecha || '');
-    const m = fecha.match(/^(\d{4})-(\d{2})/);
-    if (!m) continue;
-    const key = `${m[1]}-${m[2]}`;
+    const key = anioMes(t.fecha);
+    if (!key) continue;
+    const m = key.match(/^(\d{4})-(\d{2})/);
     const mesIdx = Number(m[2]) - 1;
     if (!porMes.has(key)) {
       porMes.set(key, { key, nombre: `${NOMBRE_MES[mesIdx]} ${m[1]}`, corto: CORTO_MES[mesIdx], ingresos: 0, gastos: 0 });

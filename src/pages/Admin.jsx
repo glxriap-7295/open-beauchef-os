@@ -187,7 +187,10 @@ export default function Admin() {
   useEffect(() => {
     if (!admin || !firebaseHabilitado()) return;
     let vivo = true;
-    listStartups().then((rows) => { if (vivo) setStartups(rows); }).catch(() => { if (vivo) setError('No se pudieron cargar las startups.'); });
+    // Nunca lanzamos un error a la UI: si falla la lectura, se trata como vacío.
+    listStartups()
+      .then((rows) => { if (vivo) setStartups(Array.isArray(rows) ? rows : []); })
+      .catch(() => { if (vivo) setStartups([]); });
     return () => { vivo = false; };
   }, [admin]);
 
@@ -215,8 +218,6 @@ export default function Admin() {
           <Estado emoji="🔒" titulo="Acceso restringido" detalle="Esta sección es solo para administradores de Open Beauchef." />
         ) : !firebaseHabilitado() ? (
           <Estado emoji="☁️" titulo="Requiere Firebase" detalle="Configura las variables VITE_FIREBASE_* para ver a las startups del piloto en tiempo real." />
-        ) : error ? (
-          <Estado emoji="⚠️" titulo="Error" detalle={error} />
         ) : startups === null ? (
           <div className="grid gap-2">{[0, 1, 2].map((i) => <div key={i} className="h-14 animate-pulse rounded-2xl bg-slate-100" />)}</div>
         ) : (
@@ -230,8 +231,10 @@ export default function Admin() {
               </select>
             </div>
 
-            {filtradas.length === 0 ? (
-              <Estado emoji="🌱" titulo="Sin resultados" detalle="No hay startups que coincidan. Cuando las emprendedoras completen su perfil, aparecerán aquí." />
+            {startups.length === 0 ? (
+              <Estado emoji="🌱" titulo="Aún no existen startups registradas." detalle="Cuando las emprendedoras creen su cuenta y completen su perfil, aparecerán aquí automáticamente." />
+            ) : filtradas.length === 0 ? (
+              <Estado emoji="🔎" titulo="Sin resultados" detalle="No hay startups que coincidan con tu búsqueda." />
             ) : (
               <div className="overflow-x-auto rounded-3xl border border-slate-100 bg-white p-2 shadow-sm">
                 <table className="w-full text-sm">

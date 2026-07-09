@@ -54,11 +54,11 @@ export default function Mentores() {
           {listoParaRevision ? (
             <>
               <div className="mx-auto mt-5 inline-flex items-center gap-2 rounded-full bg-amber-50 px-4 py-1.5 text-sm font-bold text-amber-700">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500" /> En revisión
+                <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500" /> Pending Review
               </div>
-              <h2 className="mt-4 text-xl font-extrabold text-slate-900">Tu perfil está siendo revisado</h2>
+              <h2 className="mt-4 text-xl font-extrabold text-slate-900">Tu startup está siendo revisada por Open Beauchef</h2>
               <p className="mx-auto mt-2 max-w-md text-sm text-slate-600">
-                Una vez que Open Beauchef evalúe tu Startup Profile, recibirás la asignación de tu mentor.
+                Nuestro equipo evaluará tu Startup Profile y te asignará el mentor adecuado.
                 Te avisaremos apenas esté listo.
               </p>
             </>

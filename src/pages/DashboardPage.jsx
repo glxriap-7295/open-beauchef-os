@@ -26,6 +26,10 @@ export default function DashboardPage() {
     () => (esDemo ? getMesesDerivados() : transaccionesAMeses(transacciones)),
     [esDemo, transacciones]
   );
+  // [OB-diag] temporal: qué lee el Dashboard como fuente de verdad.
+  useEffect(() => {
+    console.info('[OB-diag] Dashboard — fuente:', fuenteFinanciera, '· transacciones:', transacciones.length, '· meses:', mesesDerivados.length);
+  }, [fuenteFinanciera, transacciones, mesesDerivados]);
   const saldoBase = esDemo ? SALDO_INICIAL : 0;
   const prom = useMemo(() => promedios(mesesDerivados), [mesesDerivados]);
 

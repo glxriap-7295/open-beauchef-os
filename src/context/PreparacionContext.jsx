@@ -225,6 +225,9 @@ export function PreparacionProvider({ children }) {
       const agregadas = nuevas
         .filter((t) => !existentes.has(clave(t)))
         .map((t, i) => ({ id: t.id || `tx-${Date.now()}-${i}`, fecha: t.fecha, monto: Number(t.monto) || 0, descripcion: t.descripcion || 'Movimiento' }));
+      const total = prev.transacciones.length + agregadas.length;
+      // [OB-diag] temporal: recibidas vs agregadas vs total almacenado.
+      console.info('[OB-diag] importarTransacciones — recibidas:', nuevas.length, '· nuevas:', agregadas.length, '· total almacenado:', total);
       return {
         ...prev,
         transacciones: [...prev.transacciones, ...agregadas],
@@ -291,15 +294,35 @@ export function PreparacionProvider({ children }) {
   const setTourVisto = useCallback((v) => setEstado((prev) => ({ ...prev, tourVisto: v })), []);
   const setMentorAsignado = useCallback((mentor) => setEstado((prev) => ({ ...prev, mentorAsignado: mentor })), []);
 
-  /** Reemplaza el estado con uno traído de la nube (Firestore). No-op si vacío. */
+  /**
+   * Fusiona el estado traído de la nube (Firestore) con el local. Importante:
+   * NO pisa datos recién importados en este dispositivo. Las transacciones y los
+   * documentos se UNEN por clave (dedup), así una carga de la nube vacía o más
+   * antigua nunca borra lo que el fundador acaba de importar (bug de carrera
+   * entre importar y la hidratación asíncrona).
+   */
   const hidratar = useCallback((nuevo) => {
     if (!nuevo || typeof nuevo !== 'object') return;
-    setEstado((prev) => ({
-      ...ESTADO_INICIAL,
-      ...prev,
-      ...nuevo,
-      perfil: { ...ESTADO_INICIAL.perfil, ...(nuevo.perfil || {}) },
-    }));
+    const unir = (a = [], b = [], clave) => {
+      const mapa = new Map();
+      for (const x of [...(a || []), ...(b || [])]) mapa.set(clave(x), x);
+      return [...mapa.values()];
+    };
+    setEstado((prev) => {
+      const merged = {
+        ...ESTADO_INICIAL,
+        ...prev,
+        ...nuevo,
+        perfil: { ...ESTADO_INICIAL.perfil, ...(nuevo.perfil || {}) },
+      };
+      merged.transacciones = unir(prev.transacciones, nuevo.transacciones, (t) => `${t.fecha}|${t.monto}|${(t.descripcion || '').slice(0, 40)}`);
+      merged.documentos = unir(prev.documentos, nuevo.documentos, (d) => d.id || `${d.nombre}|${d.tipo}`);
+      // Si el local ya tiene fuente financiera y la nube no, conservar la local.
+      merged.fuenteFinanciera = nuevo.fuenteFinanciera || prev.fuenteFinanciera || null;
+      // [OB-diag] temporal: local vs nube vs fusionado (no debe perder locales).
+      console.info('[OB-diag] hidratar — local:', prev.transacciones.length, '· nube:', (nuevo.transacciones || []).length, '· fusionado:', merged.transacciones.length);
+      return merged;
+    });
   }, []);
 
   const reiniciar = useCallback(() => setEstado(ESTADO_INICIAL), []);

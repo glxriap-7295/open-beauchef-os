@@ -64,11 +64,29 @@ export function normalizarFecha(v) {
   return '';
 }
 
-function normalizarMonto(v) {
-  const limpio = String(v).replace(/[^0-9,.-]/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.');
-  const n = Number(limpio);
-  return Number.isFinite(n) ? n : 0;
+/** Magnitud absoluta de un monto en formato chileno (miles con punto, decimal con coma). */
+function magnitud(v) {
+  let s = String(v == null ? '' : v).replace(/[^0-9.,]/g, '');
+  if (!s) return 0;
+  s = s.replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.');
+  const n = Number(s);
+  return Number.isFinite(n) ? Math.abs(n) : 0;
 }
+
+/** ¿La celda representa un negativo? (signo menos o paréntesis contables). */
+function esNegativo(v) {
+  const s = String(v == null ? '' : v);
+  return /\(/.test(s) || /-/.test(s);
+}
+
+/** Monto con signo desde una sola celda (respeta -, (), y monto- final). */
+function montoConSigno(v) {
+  const mag = magnitud(v);
+  return esNegativo(v) ? -mag : mag;
+}
+
+// Compat: se mantiene el nombre por si algo lo referencia.
+function normalizarMonto(v) { return montoConSigno(v); }
 
 // Carga SheetJS (XLSX) on-demand desde CDN, solo si se sube un Excel.
 let xlsxPromise = null;
@@ -99,25 +117,67 @@ export const manualProvider = {
     const filas = parseCSV(texto);
     if (!filas.length) return { movimientos: [], resumen: { total: 0, entradas: 0, salidas: 0, neto: 0 } };
 
-    const encabezado = filas[0].map((h) => String(h).toLowerCase().trim());
-    const idxFecha = encabezado.findIndex((h) => /fecha|date/.test(h));
-    const idxDesc = encabezado.findIndex((h) => /desc|glosa|detalle|concepto|referen/.test(h));
-    const idxMonto = encabezado.findIndex((h) => /monto|amount|cargo|abono|valor|importe/.test(h));
-    const tieneHeader = idxFecha !== -1 || idxMonto !== -1;
+    const enc = filas[0].map((h) => String(h).toLowerCase().trim());
+    const buscar = (re) => enc.findIndex((h) => re.test(h));
+
+    const idxFecha = buscar(/fecha|date|d[ií]a/);
+    const idxDesc = buscar(/glosa|detalle|descrip|concepto|referen|movimiento/);
+    // Columnas separadas de egreso (cargo/débito) e ingreso (abono/crédito).
+    const idxCargo = buscar(/cargo|d[eé]bito|debe|giro|egreso|retiro/);
+    const idxAbono = buscar(/abono|cr[eé]dito|haber|dep[oó]sito|ingreso/);
+    // Columna de tipo (Ingreso/Egreso, Cargo/Abono, D/C).
+    const idxTipo = buscar(/^tipo|tipo\b|d\/c|debe\/haber/);
+    // Monto único (excluye "saldo", que es el saldo acumulado, no el movimiento).
+    const idxMonto = enc.findIndex((h) => /monto|importe|valor|amount|total/.test(h) && !/saldo/.test(h));
+
+    const tieneHeader = [idxFecha, idxDesc, idxCargo, idxAbono, idxTipo, idxMonto].some((i) => i !== -1);
     const cuerpo = tieneHeader ? filas.slice(1) : filas;
+
+    // Clasificador robusto: decide el signo (ingreso/egreso) según el formato.
+    const montoDeFila = (f) => {
+      // 1) Columnas Cargo + Abono separadas (formato más común en Chile).
+      if (idxCargo !== -1 && idxAbono !== -1) {
+        const cargo = magnitud(f[idxCargo]);
+        const abono = magnitud(f[idxAbono]);
+        if (abono && !cargo) return abono;      // ingreso
+        if (cargo && !abono) return -cargo;     // egreso
+        if (abono || cargo) return abono - cargo; // ambos con valor -> neto
+        return 0;
+      }
+      // 2) Columna "Tipo" + un monto: el tipo define el signo.
+      if (idxTipo !== -1 && idxMonto !== -1) {
+        const mag = magnitud(f[idxMonto]);
+        const tipo = String(f[idxTipo] || '').toLowerCase();
+        if (/egreso|cargo|d[eé]bito|debe|giro|gasto|compra|pago|retiro|salida|^d$|^-/.test(tipo)) return -mag;
+        if (/ingreso|abono|cr[eé]dito|haber|dep[oó]sito|entrada|^c$|^\+/.test(tipo)) return mag;
+        return montoConSigno(f[idxMonto]); // tipo poco claro -> usa el signo del monto
+      }
+      // 3) Solo columna Cargo (egresos) o solo Abono (ingresos).
+      if (idxCargo !== -1 && idxAbono === -1) return -magnitud(f[idxCargo]);
+      if (idxAbono !== -1 && idxCargo === -1) return magnitud(f[idxAbono]);
+      // 4) Monto único con signo (negativo = egreso, positivo = ingreso).
+      if (idxMonto !== -1) return montoConSigno(f[idxMonto]);
+      // 5) Sin encabezado: última celda numérica de la fila, con su signo.
+      for (let c = f.length - 1; c >= 0; c -= 1) {
+        if (magnitud(f[c])) return montoConSigno(f[c]);
+      }
+      return 0;
+    };
 
     const movimientos = cuerpo
       .map((f, i) => ({
         id: `mov-${i}`,
         fecha: normalizarFecha(f[idxFecha !== -1 ? idxFecha : 0] || ''),
         descripcion: String(f[idxDesc !== -1 ? idxDesc : 1] || 'Movimiento').trim() || 'Movimiento',
-        monto: normalizarMonto(f[idxMonto !== -1 ? idxMonto : 2] || 0),
+        monto: montoDeFila(f),
       }))
-      // Fila válida = tiene monto distinto de 0 (los montos son la señal principal).
       .filter((m) => m.monto !== 0);
 
     const entradas = movimientos.filter((m) => m.monto > 0).reduce((s, m) => s + m.monto, 0);
     const salidas = movimientos.filter((m) => m.monto < 0).reduce((s, m) => s + Math.abs(m.monto), 0);
+    // [OB-diag] temporal: columnas detectadas y clasificación.
+    console.info('[OB-diag] procesarCSV — cols {fecha,desc,cargo,abono,tipo,monto}:', [idxFecha, idxDesc, idxCargo, idxAbono, idxTipo, idxMonto],
+      '· movimientos:', movimientos.length, '· ingresos:', movimientos.filter((m) => m.monto > 0).length, '· egresos:', movimientos.filter((m) => m.monto < 0).length);
     return { movimientos, resumen: { total: movimientos.length, entradas, salidas, neto: entradas - salidas } };
   },
 

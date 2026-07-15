@@ -64,6 +64,21 @@ export const NotificationEvents = {
     cuerpo: detalle || 'Revisa tus movimientos: hay algo fuera de lo habitual.',
     tag: 'finanzas',
   }),
+  importacionCompleta: (n, institucion) => ({
+    titulo: 'Importación completada 📥',
+    cuerpo: `Se importaron ${n} movimientos${institucion ? ` desde ${institucion}` : ''}.`,
+    tag: 'importacion',
+  }),
+  transaccionesPorRevisar: (n) => ({
+    titulo: 'Necesitamos tu ayuda 🙋',
+    cuerpo: `${n} movimiento(s) no pudimos clasificar con certeza. Revísalos para que la IA aprenda.`,
+    tag: 'revision',
+  }),
+  nuevoDiagnostico: () => ({
+    titulo: 'Nuevo diagnóstico financiero 🧠',
+    cuerpo: 'El Copiloto generó un análisis de tus finanzas con tus datos reales.',
+    tag: 'diagnostico',
+  }),
 };
 
 export const notifications = {

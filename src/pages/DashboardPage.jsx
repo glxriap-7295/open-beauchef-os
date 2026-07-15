@@ -17,7 +17,7 @@ export default function DashboardPage() {
   const [vista, setVista] = useState('mensual'); // 'mensual' | 'consolidado'
   const [conectarAbierto, setConectarAbierto] = useState(false);
   const [metodoInicial, setMetodoInicial] = useState(null);
-  const { fuenteFinanciera, setFuenteFinanciera, transacciones, fintoc } = usePreparacion();
+  const { fuenteFinanciera, setFuenteFinanciera, transacciones, fintoc, diagnostico } = usePreparacion();
   const esDemo = fuenteFinanciera === 'demo';
 
   // El dataset del Copiloto: demo (Decantopia) SOLO si el usuario lo cargó;
@@ -127,6 +127,25 @@ export default function DashboardPage() {
                   {fuenteFinanciera === 'fintoc' ? 'Sincronizar' : 'Importar más'}
                 </button>
                 <Link to="/herramientas" className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-700">← Centro de Herramientas</Link>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!esDemo && diagnostico?.texto && (
+          <div className="overflow-hidden rounded-2xl border border-brand-100 bg-gradient-to-r from-brand-50/60 to-white p-4 sm:p-5">
+            <div className="flex items-start gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand text-white text-lg">🧠</span>
+              <div>
+                <p className="flex items-center gap-2 font-extrabold text-slate-900">
+                  Diagnóstico del Copiloto
+                  {diagnostico.fecha && (
+                    <span className="text-xs font-medium text-slate-400">
+                      {new Date(diagnostico.fecha).toLocaleDateString('es-CL')}
+                    </span>
+                  )}
+                </p>
+                <p className="mt-1 text-sm text-slate-600">{diagnostico.texto}</p>
               </div>
             </div>
           </div>

@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, autenticado, ready } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const destino = location.state?.from || '/app';
+
+  if (ready && autenticado) return <Navigate to={destino} replace />;
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

@@ -79,6 +79,9 @@ export const mockProvider = {
     return { campo: campo.key, pregunta: `${hito}${puente(ultimoCampo, respondidas)}${campo.pregunta}` };
   },
 
+  /** El asistente local no hace inferencia JSON; devuelve null -> heurística. */
+  async json() { return null; },
+
   /** Respuesta conversacional breve para acompañar el flujo. */
   async chat(mensajes = []) {
     await pausa(300);

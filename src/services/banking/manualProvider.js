@@ -114,8 +114,13 @@ export const manualProvider = {
    * Valida filas malformadas con gracia (nunca pierde datos parseables).
    */
   procesarCSV(texto) {
-    const filas = parseCSV(texto);
-    if (!filas.length) return { movimientos: [], resumen: { total: 0, entradas: 0, salidas: 0, neto: 0 } };
+    return this.procesarFilas(parseCSV(texto));
+  },
+
+  /** Núcleo del clasificador: procesa una matriz de filas ya extraída
+   *  (desde CSV, Excel o PDF). Reutilizado por el pipeline universal. */
+  procesarFilas(filas) {
+    if (!filas || !filas.length) return { movimientos: [], resumen: { total: 0, entradas: 0, salidas: 0, neto: 0 } };
 
     const enc = filas[0].map((h) => String(h).toLowerCase().trim());
     const buscar = (re) => enc.findIndex((h) => re.test(h));

@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export default function Registro() {
-  const { register } = useAuth();
+  const { register, autenticado, ready } = useAuth();
   const navigate = useNavigate();
+
+  if (ready && autenticado) return <Navigate to="/app" replace />;
 
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');

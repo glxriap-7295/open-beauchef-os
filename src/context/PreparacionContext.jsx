@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import { perfilVacio } from '../data/profileSchema.js';
 import { persistence } from '../services/persistence/index.js';
+import { clavePorDescripcion } from '../services/finance/categorizer.js';
 
 /**
  * Estado global del emprendedor. El Startup Profile es la única fuente de verdad;
@@ -38,6 +39,10 @@ const ESTADO_INICIAL = {
   transacciones: [],
   cuentasBancarias: [],
   fintoc: { conectado: false, banco: '', cuentas: 0, ultimaSync: null, linkToken: null },
+  // Aprendizaje: memoria de categorías del startup { claveDescripcion: categoria }.
+  categoryMappings: {},
+  // Último diagnóstico financiero de IA { texto, stats, fecha }.
+  diagnostico: null,
   copilotoActivado: false,
   umbralMentor: 70,
   // Preferencias de experiencia
@@ -220,11 +225,21 @@ export function PreparacionProvider({ children }) {
    */
   const importarTransacciones = useCallback((nuevas = [], meta = {}) => {
     setEstado((prev) => {
+      // Normaliza aceptando el modelo simple {fecha,monto,descripcion} y el
+      // modelo del pipeline {date,amount,description,category,type,confidence,source}.
+      const norm = (t, i) => ({
+        id: t.id || `tx-${Date.now()}-${i}`,
+        fecha: t.fecha || t.date || '',
+        monto: Number(t.monto ?? t.amount) || 0,
+        descripcion: t.descripcion || t.description || 'Movimiento',
+        categoria: t.categoria || t.category || null,
+        tipo: t.tipo || t.type || (Number(t.monto ?? t.amount) >= 0 ? 'ingreso' : 'egreso'),
+        confianza: t.confianza ?? t.confidence ?? null,
+        source: t.source || meta.fuente || null,
+      });
       const clave = (t) => `${t.fecha}|${t.monto}|${(t.descripcion || '').slice(0, 40)}`;
       const existentes = new Set(prev.transacciones.map(clave));
-      const agregadas = nuevas
-        .filter((t) => !existentes.has(clave(t)))
-        .map((t, i) => ({ id: t.id || `tx-${Date.now()}-${i}`, fecha: t.fecha, monto: Number(t.monto) || 0, descripcion: t.descripcion || 'Movimiento' }));
+      const agregadas = nuevas.map(norm).filter((t) => !existentes.has(clave(t)));
       const total = prev.transacciones.length + agregadas.length;
       // [OB-diag] temporal: recibidas vs agregadas vs total almacenado.
       console.info('[OB-diag] importarTransacciones — recibidas:', nuevas.length, '· nuevas:', agregadas.length, '· total almacenado:', total);
@@ -251,6 +266,33 @@ export function PreparacionProvider({ children }) {
       cuentasBancarias: [],
       fintoc: { conectado: false, banco: '', cuentas: 0, ultimaSync: null, linkToken: null },
     }));
+  }, []);
+
+  /**
+   * Sistema de aprendizaje: cuando el fundador corrige (o confirma) la categoría
+   * de una transacción, se guarda en categoryMappings (clave estable por
+   * descripción) para reutilizarla en futuras importaciones SIN llamar a la IA, y
+   * se re-etiquetan todas las transacciones actuales que compartan esa clave.
+   * La corrección del fundador es la fuente de verdad → confianza 100.
+   */
+  const aprenderCategoria = useCallback((descripcion, categoria) => {
+    if (!descripcion || !categoria) return;
+    const clave = clavePorDescripcion(descripcion);
+    if (!clave) return;
+    setEstado((prev) => {
+      const categoryMappings = { ...(prev.categoryMappings || {}), [clave]: categoria };
+      const transacciones = prev.transacciones.map((t) =>
+        clavePorDescripcion(t.descripcion) === clave
+          ? { ...t, categoria, confianza: 100, source: 'fundador' }
+          : t,
+      );
+      return { ...prev, categoryMappings, transacciones };
+    });
+  }, []);
+
+  /** Guarda el último diagnóstico financiero generado por la IA. */
+  const setDiagnostico = useCallback((diag) => {
+    setEstado((prev) => ({ ...prev, diagnostico: diag || null }));
   }, []);
 
   const agregarLogro = useCallback((titulo, icono = '✨') => {
@@ -348,6 +390,8 @@ export function PreparacionProvider({ children }) {
       alternarTarea,
       setFuenteFinanciera,
       importarTransacciones,
+      aprenderCategoria,
+      setDiagnostico,
       setFintoc,
       limpiarFinanzas,
       agregarLogro,
@@ -367,7 +411,7 @@ export function PreparacionProvider({ children }) {
       estado, dimensiones, nivel, mentorDesbloqueado, objetivos, gaps, bonusPreparacion,
       completarRecomendacion, completarDemoFinanciera, actualizarPerfil, setFundadora,
       subirDocumento, setEstadoDocumento, renombrarDocumento, eliminarDocumento,
-      alternarTarea, setFuenteFinanciera, importarTransacciones, setFintoc, limpiarFinanzas,
+      alternarTarea, setFuenteFinanciera, importarTransacciones, aprenderCategoria, setDiagnostico, setFintoc, limpiarFinanzas,
       agregarLogro, asegurarOwner, invitarMiembro,
       cancelarInvitacion, eliminarMiembro, setNotificaciones, setVoiceMode, setTourVisto,
       setMentorAsignado, hidratar, reiniciar,

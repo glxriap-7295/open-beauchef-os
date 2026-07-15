@@ -39,6 +39,16 @@ function crearSmartProvider() {
     analyzeEvidence: conFallback('analyzeEvidence'),
     nextQuestion: conFallback('nextQuestion'),
     chat: conFallback('chat'),
+    // Inferencia JSON para el pipeline financiero. Si el proveedor falla o no
+    // soporta JSON (mock), devuelve null y el pipeline usa heurísticas.
+    async json(prompt) {
+      try {
+        const r = await primario.json?.(prompt);
+        return r ?? null;
+      } catch {
+        return null;
+      }
+    },
   };
 }
 

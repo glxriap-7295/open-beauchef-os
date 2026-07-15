@@ -85,4 +85,9 @@ export const ollamaProvider = {
     const prompt = `Eres el asistente de Open Beauchef, cálido y conciso (español chileno).\n${conv}\nassistant:`;
     return (await generar(prompt)).trim();
   },
+
+  /** Inferencia estructurada: devuelve JSON parseado (para el pipeline financiero). */
+  async json(prompt) {
+    return JSON.parse(await generar(prompt, { json: true }));
+  },
 };

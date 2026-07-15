@@ -69,4 +69,9 @@ export const claudeProvider = {
     const conv = mensajes.map((m) => `${m.rol}: ${m.contenido}`).join('\n');
     return (await ask(`Asistente de Open Beauchef, cálido y conciso (español chileno).\n${conv}\nassistant:`)).trim();
   },
+
+  /** Inferencia estructurada: devuelve JSON parseado (para el pipeline financiero). */
+  async json(prompt) {
+    return ask(prompt, { json: true });
+  },
 };

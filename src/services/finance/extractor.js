@@ -1,9 +1,10 @@
 /**
  * Importador universal: convierte CUALQUIER archivo financiero en filas crudas
  * + texto, sin confiar en la extensión (inspecciona el contenido).
- * Soporta CSV/TXT (auto-delimitador), XLS/XLSX (SheetJS), y PDF (pdf.js texto).
- * Los PDF escaneados se marcan para OCR (Tesseract, mejor esfuerzo).
- * Librerías pesadas se cargan on-demand desde CDN (cero dependencias npm).
+ * Soporta CSV/TXT (auto-delimitador, UTF-8/Latin-1), XLS/XLSX (SheetJS, incl.
+ * exportes "texto dentro de una celda" de Banco de Chile), y PDF (pdf.js texto;
+ * OCR con Tesseract si está escaneado). Librerías pesadas se cargan on-demand
+ * desde CDN (cero dependencias npm).
  */
 
 // ── Cargadores de librerías desde CDN ──────────────────────────────
@@ -32,6 +33,13 @@ function cargarPDF() {
   return pdfP;
 }
 
+let tessP = null;
+function cargarTesseract() {
+  if (window.Tesseract) return Promise.resolve(window.Tesseract);
+  if (!tessP) tessP = cdn('https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.0/tesseract.min.js').then(() => window.Tesseract);
+  return tessP;
+}
+
 // ── Detección de tipo por contenido (magic bytes) ──────────────────
 function detectarTipo(bytes, nombre = '') {
   const head = String.fromCharCode(...bytes.slice(0, 8));
@@ -43,8 +51,19 @@ function detectarTipo(bytes, nombre = '') {
   return 'text';                                                       // CSV / TXT / delimitado
 }
 
+// ── Decodificación de texto UTF-8 con fallback Latin-1 ─────────────
+// TextDecoder utf-8 no lanza en bytes inválidos: inserta  (U+FFFD).
+// Si aparecen esos caracteres de reemplazo, reintentamos con Latin-1
+// (windows-1252), común en exportes bancarios chilenos antiguos.
+export function decodificarTexto(bytes) {
+  const utf8 = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+  if (!utf8.includes('�')) return utf8;
+  try { return new TextDecoder('windows-1252').decode(bytes); }
+  catch { return new TextDecoder('latin1').decode(bytes); }
+}
+
 // ── Parser delimitado con auto-detección de separador ──────────────
-function detectarDelimitador(texto) {
+export function detectarDelimitador(texto) {
   const linea = (texto.split('\n').find((l) => l.trim()) || '');
   const cont = (ch) => (linea.match(new RegExp(`\\${ch}`, 'g')) || []).length;
   const cand = [[';', cont(';')], [',', cont(',')], ['\t', cont('\t')], ['|', cont('|')]];
@@ -71,6 +90,27 @@ export function parseDelimitado(texto, delim) {
   return filas.filter((f) => f.some((x) => String(x).trim() !== ''));
 }
 
+// ── Exportes "texto dentro de una celda" (Banco de Chile legacy) ────
+// Algunos Excel guardan la fila completa "Fecha;Detalle;Cargo;Abono;Saldo"
+// dentro de UNA sola celda. Nunca asumir 1 celda = 1 campo: si la mayoría de
+// las filas tienen 1 columna útil pero contienen un delimitador, re-partir.
+export function repartirFilasEmpaquetadas(filas) {
+  if (!filas || !filas.length) return filas;
+  const utilCount = (f) => f.filter((x) => String(x).trim() !== '').length;
+  const empaquetadas = filas.filter((f) => utilCount(f) === 1);
+  // ¿La mayoría es de una sola celda?
+  if (empaquetadas.length < Math.max(2, filas.length * 0.6)) return filas;
+  // Texto de la única celda no vacía.
+  const soloCelda = (f) => String(f.find((x) => String(x).trim() !== '') || '');
+  const muestra = empaquetadas.map(soloCelda).join('\n');
+  const delim = detectarDelimitador(muestra);
+  if (!/[;,\t|]/.test(muestra)) return filas; // no hay nada que re-partir
+  return filas.map((f) => {
+    if (utilCount(f) !== 1) return f;
+    return parseDelimitado(soloCelda(f), delim)[0] || f;
+  });
+}
+
 // Deriva filas tabulares aproximadas desde texto de PDF (2+ espacios = columna).
 function filasDesdeTexto(texto) {
   return texto.split('\n')
@@ -80,9 +120,7 @@ function filasDesdeTexto(texto) {
     .filter((f) => f.length >= 2);
 }
 
-async function textoDesdePDF(bytes) {
-  const pdfjs = await cargarPDF();
-  const doc = await pdfjs.getDocument({ data: bytes }).promise;
+async function textoDesdePDF(bytes, doc) {
   let texto = '';
   for (let p = 1; p <= doc.numPages; p += 1) {
     // eslint-disable-next-line no-await-in-loop
@@ -94,11 +132,34 @@ async function textoDesdePDF(bytes) {
   return texto;
 }
 
+// Renderiza cada página del PDF a canvas y aplica OCR (Tesseract, español).
+async function ocrDesdePDF(pdfjs, doc, onPaso) {
+  const Tesseract = await cargarTesseract();
+  let texto = '';
+  const maxPag = Math.min(doc.numPages, 10); // límite razonable de OCR
+  for (let p = 1; p <= maxPag; p += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const page = await doc.getPage(p);
+    const viewport = page.getViewport({ scale: 2 });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width; canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d');
+    // eslint-disable-next-line no-await-in-loop
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    try { onPaso?.('ocr'); } catch { /* noop */ }
+    // eslint-disable-next-line no-await-in-loop
+    const { data } = await Tesseract.recognize(canvas, 'spa');
+    texto += (data?.text || '') + '\n';
+  }
+  return texto;
+}
+
 /**
  * Extrae un archivo a { tipo, texto, filas } (filas = matriz de celdas).
  * @param {File} file
+ * @param {object} opts { onPaso, ocr }  ocr=true habilita OCR de PDFs escaneados
  */
-export async function extraerArchivo(file) {
+export async function extraerArchivo(file, { onPaso, ocr = true } = {}) {
   const buf = new Uint8Array(await file.arrayBuffer());
   const tipo = detectarTipo(buf, file.name);
 
@@ -106,22 +167,29 @@ export async function extraerArchivo(file) {
     const XLSX = await cargarXLSX();
     const wb = XLSX.read(buf, { type: 'array' });
     const hoja = wb.Sheets[wb.SheetNames[0]];
-    const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, raw: false, defval: '' });
+    let filas = XLSX.utils.sheet_to_json(hoja, { header: 1, raw: false, defval: '' });
+    filas = repartirFilasEmpaquetadas(filas); // Banco de Chile legacy
     const texto = XLSX.utils.sheet_to_csv(hoja);
     return { tipo: 'excel', texto, filas };
   }
 
   if (tipo === 'pdf') {
+    const pdfjs = await cargarPDF();
+    const doc = await pdfjs.getDocument({ data: buf }).promise;
     let texto = '';
-    try { texto = await textoDesdePDF(buf); } catch { texto = ''; }
-    const filas = filasDesdeTexto(texto);
-    // PDF sin texto extraíble => escaneado. Señalamos OCR (mejor esfuerzo aparte).
+    try { texto = await textoDesdePDF(buf, doc); } catch { texto = ''; }
+    let filas = filasDesdeTexto(texto);
+    // PDF sin texto extraíble => escaneado. Intentamos OCR (mejor esfuerzo).
+    if (!filas.length && ocr) {
+      try {
+        texto = await ocrDesdePDF(pdfjs, doc, onPaso);
+        filas = filasDesdeTexto(texto);
+      } catch { /* OCR falló: se marca escaneado abajo */ }
+    }
     return { tipo: filas.length ? 'pdf' : 'pdf-escaneado', texto, filas };
   }
 
-  // Texto (CSV/TXT/delimitado). Decodifica UTF-8 con fallback Latin-1.
-  let texto;
-  try { texto = new TextDecoder('utf-8', { fatal: false }).decode(buf); }
-  catch { texto = new TextDecoder('latin1').decode(buf); }
+  // Texto (CSV/TXT/delimitado). UTF-8 con fallback Latin-1.
+  const texto = decodificarTexto(buf);
   return { tipo: 'texto', texto, filas: parseDelimitado(texto) };
 }

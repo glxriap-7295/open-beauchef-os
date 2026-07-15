@@ -43,6 +43,8 @@ const ESTADO_INICIAL = {
   categoryMappings: {},
   // Último diagnóstico financiero de IA { texto, stats, fecha }.
   diagnostico: null,
+  // Historial de importaciones para detectar duplicados a futuro.
+  importHistory: [],
   copilotoActivado: false,
   umbralMentor: 70,
   // Preferencias de experiencia
@@ -295,6 +297,17 @@ export function PreparacionProvider({ children }) {
     setEstado((prev) => ({ ...prev, diagnostico: diag || null }));
   }, []);
 
+  /** Registra una importación en el historial (para dedup futuro). Evita
+   *  duplicar el mismo documento por hash. */
+  const registrarImportacion = useCallback((registro) => {
+    if (!registro) return;
+    setEstado((prev) => {
+      const previos = prev.importHistory || [];
+      if (registro.hash && previos.some((h) => h.hash === registro.hash)) return prev;
+      return { ...prev, importHistory: [registro, ...previos].slice(0, 50) };
+    });
+  }, []);
+
   const agregarLogro = useCallback((titulo, icono = '✨') => {
     setEstado((prev) => ({
       ...prev,
@@ -392,6 +405,7 @@ export function PreparacionProvider({ children }) {
       importarTransacciones,
       aprenderCategoria,
       setDiagnostico,
+      registrarImportacion,
       setFintoc,
       limpiarFinanzas,
       agregarLogro,
@@ -411,7 +425,7 @@ export function PreparacionProvider({ children }) {
       estado, dimensiones, nivel, mentorDesbloqueado, objetivos, gaps, bonusPreparacion,
       completarRecomendacion, completarDemoFinanciera, actualizarPerfil, setFundadora,
       subirDocumento, setEstadoDocumento, renombrarDocumento, eliminarDocumento,
-      alternarTarea, setFuenteFinanciera, importarTransacciones, aprenderCategoria, setDiagnostico, setFintoc, limpiarFinanzas,
+      alternarTarea, setFuenteFinanciera, importarTransacciones, aprenderCategoria, setDiagnostico, registrarImportacion, setFintoc, limpiarFinanzas,
       agregarLogro, asegurarOwner, invitarMiembro,
       cancelarInvitacion, eliminarMiembro, setNotificaciones, setVoiceMode, setTourVisto,
       setMentorAsignado, hidratar, reiniciar,

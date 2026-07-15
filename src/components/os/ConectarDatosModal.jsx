@@ -11,6 +11,7 @@ import { CATEGORIAS } from '../../services/finance/categorizer.js';
 // Pasos de procesamiento IA (Parte 16). El pipeline llama onPaso con estas claves.
 const PASOS = [
   ['detectando', 'Analizando el archivo…'],
+  ['ocr', 'Reconociendo texto (OCR)'],
   ['leyendo', 'Leyendo transacciones'],
   ['entendiendo', 'Entendiendo tu negocio'],
   ['categorizando', 'Categorizando movimientos'],
@@ -21,6 +22,7 @@ export default function ConectarDatosModal({ onClose, metodoInicial = null }) {
   const {
     agregarLogro, importarTransacciones, notificacionesActivas,
     categoryMappings, aprenderCategoria, setDiagnostico,
+    transacciones, registrarImportacion,
   } = usePreparacion();
   const [metodo, setMetodo] = useState(metodoInicial === 'fintoc' ? 'fintoc' : (metodoInicial ? 'manual' : null));
   const [resultado, setResultado] = useState(null);
@@ -68,6 +70,7 @@ export default function ConectarDatosModal({ onClose, metodoInicial = null }) {
     try {
       const res = await analizarArchivo(file, {
         mappings: categoryMappings || {},
+        existentes: transacciones || [],
         onPaso: (p) => setPaso(p),
       });
       if (res.error) {
@@ -95,6 +98,7 @@ export default function ConectarDatosModal({ onClose, metodoInicial = null }) {
       for (const m of movs) {
         if (m.source === 'fundador' && m.category) aprenderCategoria(m.description, m.category);
       }
+      if (analisis.historial) registrarImportacion(analisis.historial);
       const diag = await generarDiagnostico(movs, { negocio: analisis.negocio });
       setDiagnostico({ texto: diag.texto, fecha: new Date().toISOString(), stats: diag.stats });
 
@@ -260,6 +264,22 @@ export default function ConectarDatosModal({ onClose, metodoInicial = null }) {
             </div>
           </div>
 
+          {/* Aviso de duplicados (Parte crítica): no reimportamos lo que ya existe. */}
+          {analisis.duplicados?.length > 0 && (
+            <div className="rounded-2xl border border-sky-100 bg-sky-50/60 p-4 text-sm text-slate-600">
+              Encontramos <b>{analisis.duplicados.length}</b> movimiento(s) que ya existen.
+              {analisis.total > 0
+                ? <> Solo importaremos los <b>{analisis.total}</b> movimiento(s) nuevo(s).</>
+                : <> No hay movimientos nuevos para importar.</>}
+            </div>
+          )}
+
+          {analisis.sospechosos?.length > 0 && (
+            <div className="rounded-2xl border border-rose-100 bg-rose-50/60 p-4 text-sm text-slate-600">
+              ⚠️ {analisis.sospechosos.length} monto(s) inusualmente grande(s) quedaron marcados para tu revisión (posible número de cuenta o referencia mal leído).
+            </div>
+          )}
+
           {/* Revisión de transacciones inciertas: "Necesitamos tu ayuda" */}
           {analisis.revisar.length > 0 && (
             <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-5">
@@ -291,17 +311,17 @@ export default function ConectarDatosModal({ onClose, metodoInicial = null }) {
           <div className="flex flex-wrap gap-3">
             <button
               onClick={confirmarImportacion}
-              disabled={cargando}
-              className="rounded-xl bg-brand px-5 py-2.5 text-sm font-bold text-white transition hover:bg-brand-dark"
+              disabled={cargando || analisis.total === 0}
+              className="rounded-xl bg-brand px-5 py-2.5 text-sm font-bold text-white transition hover:bg-brand-dark disabled:opacity-50"
             >
-              {cargando ? 'Importando…' : `Importar ${analisis.total} movimientos`}
+              {cargando ? 'Importando…' : analisis.total === 0 ? 'Nada nuevo para importar' : `Importar ${analisis.total} movimientos`}
             </button>
             <button
               onClick={() => setAnalisis(null)}
               disabled={cargando}
               className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
             >
-              Cancelar
+              {analisis.total === 0 ? 'Cerrar' : 'Cancelar'}
             </button>
           </div>
         </div>

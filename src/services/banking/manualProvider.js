@@ -64,11 +64,16 @@ export function normalizarFecha(v) {
   return '';
 }
 
+/** Monto sospechoso: por encima de este umbral no se importa a ciegas. */
+export const UMBRAL_SOSPECHOSO = 1_000_000_000; // CLP 1.000 millones
+
 /** Magnitud absoluta de un monto en formato chileno (miles con punto, decimal con coma). */
 function magnitud(v) {
   let s = String(v == null ? '' : v).replace(/[^0-9.,]/g, '');
   if (!s) return 0;
   s = s.replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.');
+  // Ignora ceros a la izquierda (p.ej. +0000264251 → 264251) sin perder decimales.
+  s = s.replace(/^0+(?=\d)/, '');
   const n = Number(s);
   return Number.isFinite(n) ? Math.abs(n) : 0;
 }
@@ -125,15 +130,19 @@ export const manualProvider = {
     const enc = filas[0].map((h) => String(h).toLowerCase().trim());
     const buscar = (re) => enc.findIndex((h) => re.test(h));
 
+    // Columnas que NUNCA son montos de movimiento (saldo acumulado, números de
+    // cuenta, documento, referencia, rut, sucursal, caja, id de transacción…).
+    const esRef = (h) => /saldo|balance|n[°º.]?\s*cuenta|cuenta|account|docto|documento|comprobante|referen|folio|\brut\b|sucursal|oficina|caja|\btrn\b|\bnro?\b|n[uú]mero|codigo|c[oó]d\b/.test(h);
+
     const idxFecha = buscar(/fecha|date|d[ií]a/);
-    const idxDesc = buscar(/glosa|detalle|descrip|concepto|referen|movimiento/);
+    const idxDesc = buscar(/glosa|detalle|descrip|concepto|movimiento/);
     // Columnas separadas de egreso (cargo/débito) e ingreso (abono/crédito).
     const idxCargo = buscar(/cargo|d[eé]bito|debe|giro|egreso|retiro/);
     const idxAbono = buscar(/abono|cr[eé]dito|haber|dep[oó]sito|ingreso/);
     // Columna de tipo (Ingreso/Egreso, Cargo/Abono, D/C).
     const idxTipo = buscar(/^tipo|tipo\b|d\/c|debe\/haber/);
-    // Monto único (excluye "saldo", que es el saldo acumulado, no el movimiento).
-    const idxMonto = enc.findIndex((h) => /monto|importe|valor|amount|total/.test(h) && !/saldo/.test(h));
+    // Monto único (excluye saldo, cuenta, documento, referencia, etc.).
+    const idxMonto = enc.findIndex((h) => /monto|importe|valor|amount|total/.test(h) && !esRef(h));
 
     const tieneHeader = [idxFecha, idxDesc, idxCargo, idxAbono, idxTipo, idxMonto].some((i) => i !== -1);
     const cuerpo = tieneHeader ? filas.slice(1) : filas;
@@ -162,20 +171,27 @@ export const manualProvider = {
       if (idxAbono !== -1 && idxCargo === -1) return magnitud(f[idxAbono]);
       // 4) Monto único con signo (negativo = egreso, positivo = ingreso).
       if (idxMonto !== -1) return montoConSigno(f[idxMonto]);
-      // 5) Sin encabezado: última celda numérica de la fila, con su signo.
+      // 5) Sin encabezado: última celda numérica de la fila (saltando columnas
+      //    de referencia/saldo conocidas), con su signo.
       for (let c = f.length - 1; c >= 0; c -= 1) {
+        if (esRef(enc[c] || '')) continue;
         if (magnitud(f[c])) return montoConSigno(f[c]);
       }
       return 0;
     };
 
     const movimientos = cuerpo
-      .map((f, i) => ({
-        id: `mov-${i}`,
-        fecha: normalizarFecha(f[idxFecha !== -1 ? idxFecha : 0] || ''),
-        descripcion: String(f[idxDesc !== -1 ? idxDesc : 1] || 'Movimiento').trim() || 'Movimiento',
-        monto: montoDeFila(f),
-      }))
+      .map((f, i) => {
+        const monto = montoDeFila(f);
+        return {
+          id: `mov-${i}`,
+          fecha: normalizarFecha(f[idxFecha !== -1 ? idxFecha : 0] || ''),
+          descripcion: String(f[idxDesc !== -1 ? idxDesc : 1] || 'Movimiento').trim() || 'Movimiento',
+          monto,
+          // Monto irrealmente grande → sospechoso (posible n° de cuenta/ref mal leído).
+          sospechoso: Math.abs(monto) > UMBRAL_SOSPECHOSO,
+        };
+      })
       .filter((m) => m.monto !== 0);
 
     const entradas = movimientos.filter((m) => m.monto > 0).reduce((s, m) => s + m.monto, 0);

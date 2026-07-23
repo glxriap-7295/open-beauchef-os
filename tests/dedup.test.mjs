@@ -5,7 +5,7 @@ import { separarDuplicados } from '../src/services/finance/dedup.js';
 const mk = (id, d, a, desc) => ({ id, date: d, amount: a, description: desc });
 
 export default function run() {
-  const { ok, eq } = createSuite('dedup');
+  const { ok, eq, report } = createSuite('dedup');
 
   // 5 distinct → 5 kept
   eq(separarDuplicados([mk('a', '2025-06-01', -1, 'x'), mk('b', '2025-06-02', -2, 'y'), mk('c', '2025-06-03', -3, 'z')], []).nuevos.length, 3, '3 distinct → 3');

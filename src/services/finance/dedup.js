@@ -18,7 +18,19 @@ export function normalizarDescripcion(desc) {
     .trim();
 }
 
-/** Similitud de tokens (Jaccard) entre dos descripciones normalizadas. 0..1. */
+/**
+ * Similitud de descripciones normalizadas (0..1). Usa el COEFICIENTE DE
+ * SOLAPAMIENTO (intersección / tamaño de la más corta), no Jaccard.
+ *
+ * Motivo: el dedup existe para detectar el MISMO extracto subido en dos formatos
+ * (CSV y PDF), donde una descripción suele ser una versión reformateada o
+ * truncada de la otra (p.ej. "BLUEXPRESS 998" vs "Bluexpress ENVIO"). Jaccard
+ * penaliza la palabra extra (0.5) y deja pasar el duplicado; el solapamiento
+ * mide si los tokens de la descripción más corta están contenidos en la más
+ * larga (1.0), que es la señal correcta. Solo se usa en scoreDuplicado, que
+ * exige además mismo monto y ±1 día, y solo compara contra lo YA importado; las
+ * descripciones sin tokens en común siguen dando 0.
+ */
 export function similitudDescripcion(a, b) {
   const ta = new Set(normalizarDescripcion(a).split(' ').filter(Boolean));
   const tb = new Set(normalizarDescripcion(b).split(' ').filter(Boolean));
@@ -26,7 +38,7 @@ export function similitudDescripcion(a, b) {
   if (!ta.size || !tb.size) return 0;
   let inter = 0;
   for (const t of ta) if (tb.has(t)) inter += 1;
-  return inter / (ta.size + tb.size - inter);
+  return inter / Math.min(ta.size, tb.size);
 }
 
 function diasEntre(a, b) {

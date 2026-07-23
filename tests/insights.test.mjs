@@ -3,7 +3,7 @@ import { createSuite } from './harness.mjs';
 import { computeInsights } from '../src/services/finance/insightEngine.js';
 
 export default function run() {
-  const { ok, eq } = createSuite('insights');
+  const { ok, eq, report } = createSuite('insights');
 
   const txs = [
     // April

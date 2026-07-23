@@ -4,7 +4,7 @@ import { categorize, CATEGORY_REGISTRY, resolveCategoryId } from '../src/service
 import { categorizar, CATEGORIAS, clavePorDescripcion } from '../src/services/finance/categorizer.js';
 
 export default function run() {
-  const { ok, eq } = createSuite('categorize');
+  const { ok, eq, report } = createSuite('categorize');
 
   // Backward-compat (legacy Spanish labels) — the original qa.mjs expectations.
   eq(categorizar('Pago Meta Ads Facebook', -50000).categoria, 'Marketing', 'Meta Ads → Marketing');

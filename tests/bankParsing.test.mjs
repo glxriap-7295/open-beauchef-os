@@ -5,7 +5,7 @@ import { manualProvider } from '../src/services/banking/manualProvider.js';
 const montos = (r) => r.movimientos.map((m) => m.monto);
 
 export default function run() {
-  const { ok, eq } = createSuite('bankParsing');
+  const { ok, eq, report } = createSuite('bankParsing');
 
   // Banco de Chile — Cargo/Abono/Saldo
   let r = manualProvider.procesarFilas([

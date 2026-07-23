@@ -3,7 +3,7 @@ import { createSuite } from './harness.mjs';
 import { aprobar, editarCategoria, eliminarImportacion, eliminarTransaccion, backfillLegacy } from '../src/services/finance/importSessions.js';
 
 export default function run() {
-  const { ok, eq } = createSuite('importSessions');
+  const { ok, eq, report } = createSuite('importSessions');
 
   const draft = [
     { id: 'a', date: '2025-05-02', amount: 450000, description: 'ABONO STRIPE', categoryId: 'revenue', original: { categoryId: 'revenue', confidence: 96, source: 'merchant', merchantId: 'stripe', merchant: 'Stripe', reason: 'x' } },

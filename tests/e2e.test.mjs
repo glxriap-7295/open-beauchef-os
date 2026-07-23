@@ -8,7 +8,7 @@ import { resumenContable, tratamiento, categoryIdDeTransaccion } from '../src/se
 import { computeInsights } from '../src/services/finance/insightEngine.js';
 
 export default function run() {
-  const { ok, eq } = createSuite('e2e');
+  const { ok, eq, report } = createSuite('e2e');
 
   // 1-2) Parse a statement that includes a transfer + an owner contribution.
   const { movimientos: base } = manualProvider.procesarFilas([

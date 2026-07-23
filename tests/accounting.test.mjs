@@ -4,7 +4,7 @@ import { validateAccountingMap, resumenContable, tratamiento } from '../src/serv
 import { transaccionesAMeses } from '../src/utils/calculations.js';
 
 export default function run() {
-  const { ok, eq } = createSuite('accounting');
+  const { ok, eq, report } = createSuite('accounting');
 
   // The map must be valid: every category mapped, guardrails intact.
   const v = validateAccountingMap();
@@ -43,8 +43,12 @@ export default function run() {
 
   // Accounting summary
   const r = resumenContable(txs);
-  eq(r.revenue, 450000, 'summary revenue excludes non-P&L');
-  eq(r.financingIn, 5000000, 'owner contribution → financing, not revenue');
+  eq(r.revenue, 450000, 'summary revenue excludes non-P&L (transfers/loans/owner)');
+  // financingIn is the sum of ALL financing inflows: loans (5,000,000) +
+  // owner contributions (1,000,000) = 6,000,000. The transfer (2,000,000) is
+  // 'internal' and excluded. (The previous expected value of 5,000,000 was a
+  // copy-slip that only counted the loan; the app is correct.)
+  eq(r.financingIn, 6000000, 'loans + owner contributions → financing (not revenue)');
   eq(r.ebitda, r.grossProfit - r.opex, 'EBITDA = grossProfit − opex');
 
   // Legacy Spanish labels still route

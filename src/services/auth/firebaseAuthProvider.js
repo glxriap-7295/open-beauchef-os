@@ -18,14 +18,16 @@ import { authFb } from '../firebase/app.js';
 const map = (u) => (u ? { id: u.uid, nombre: u.displayName || (u.email || '').split('@')[0], email: u.email } : null);
 
 // La sesión persiste en el navegador hasta "Cerrar sesión".
-if (authFb) setPersistence(authFb, browserLocalPersistence).catch(() => {});
+if (authFb) setPersistence(authFb, browserLocalPersistence)
+  .catch((e) => console.warn('[Auth] No se pudo fijar la persistencia de sesión:', e?.message || e));
 
 export const firebaseAuthProvider = {
   id: 'firebase',
 
   async register({ nombre, email, password }) {
     const cr = await createUserWithEmailAndPassword(authFb, email, password);
-    if (nombre) await updateProfile(cr.user, { displayName: nombre }).catch(() => {});
+    if (nombre) await updateProfile(cr.user, { displayName: nombre })
+      .catch((e) => console.warn('[Auth] No se pudo fijar el nombre del perfil:', e?.message || e));
     return map(cr.user);
   },
 
@@ -50,8 +52,10 @@ export const firebaseAuthProvider = {
   async updateUser(patch) {
     const u = authFb?.currentUser;
     if (!u) return null;
-    if (patch.nombre !== undefined) await updateProfile(u, { displayName: patch.nombre }).catch(() => {});
-    if (patch.password) await updatePassword(u, patch.password).catch(() => {});
+    if (patch.nombre !== undefined) await updateProfile(u, { displayName: patch.nombre })
+      .catch((e) => console.warn('[Auth] No se pudo actualizar el nombre:', e?.message || e));
+    if (patch.password) await updatePassword(u, patch.password)
+      .catch((e) => { console.warn('[Auth] No se pudo actualizar la contraseña:', e?.message || e); throw e; });
     return map(authFb.currentUser);
   },
 };

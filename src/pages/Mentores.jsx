@@ -16,7 +16,8 @@ export default function Mentores() {
   useEffect(() => {
     if (!firebaseHabilitado() || !user?.id) return;
     let vivo = true;
-    loadAsignacion(user.id).then((a) => { if (vivo) setAsignacion(a); }).catch(() => {});
+    loadAsignacion(user.id).then((a) => { if (vivo) setAsignacion(a); })
+      .catch((e) => console.warn('[Mentores] No se pudo cargar la asignación de mentor:', e?.message || e));
     return () => { vivo = false; };
   }, [user?.id]);
 

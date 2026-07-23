@@ -29,7 +29,7 @@ export default function CloudSync() {
       .then((doc) => {
         if (vivo && doc) hidratar(doc);
       })
-      .catch(() => {})
+      .catch((e) => console.warn('[CloudSync] No se pudo cargar el estado desde Firestore:', e?.message || e))
       .finally(() => { if (vivo) hidratadoRef.current = true; });
     return () => { vivo = false; };
   }, [user?.id, hidratar]);
@@ -38,7 +38,8 @@ export default function CloudSync() {
   useEffect(() => {
     if (!firebaseHabilitado() || !user?.id || !hidratadoRef.current) return undefined;
     const t = setTimeout(() => {
-      saveStartup(user.id, estadoRaw, user).catch(() => {});
+      saveStartup(user.id, estadoRaw, user)
+        .catch((e) => console.error('[CloudSync] Firestore rechazó el guardado (las transacciones no se persistieron):', e?.message || e));
     }, 800);
     return () => clearTimeout(t);
   }, [estadoRaw, user]);

@@ -75,11 +75,20 @@ export const UMBRAL_DUPLICADO = 0.72;
 export function separarDuplicados(entrantes = [], existentes = []) {
   const nuevos = [];
   const duplicados = [];
-  const yaVistos = [...existentes];
+  // Clave EXACTA (fecha + monto + glosa cruda) para no perder movimientos
+  // recurrentes legítimos dentro de un mismo archivo (misma cuota varios días,
+  // transferencias iguales, etc.). El match difuso (±1 día + descripción
+  // parecida) solo se aplica contra lo YA IMPORTADO, para atrapar el caso de
+  // subir el MISMO extracto como CSV y como PDF sin duplicar.
+  const claveExacta = (m) =>
+    `${m.date ?? m.fecha}|${Math.round(Math.abs(Number(m.amount ?? m.monto) || 0))}|${String(m.description ?? m.descripcion ?? '').trim().toLowerCase()}`;
+  const vistosExactos = new Set();
   for (const m of entrantes) {
-    const dup = yaVistos.some((e) => scoreDuplicado(m, e) >= UMBRAL_DUPLICADO);
-    if (dup) duplicados.push(m);
-    else { nuevos.push(m); yaVistos.push(m); } // evita duplicados dentro del lote
+    const dupExistente = existentes.some((e) => scoreDuplicado(m, e) >= UMBRAL_DUPLICADO);
+    const k = claveExacta(m);
+    const dupInterno = vistosExactos.has(k); // solo repeticiones IDÉNTICAS del propio archivo
+    if (dupExistente || dupInterno) duplicados.push(m);
+    else { nuevos.push(m); vistosExactos.add(k); }
   }
   return { nuevos, duplicados };
 }

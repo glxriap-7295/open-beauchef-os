@@ -3,6 +3,7 @@
  * Todos los montos en CLP.
  */
 import { PALOMA_MESES, SALDO_INICIAL } from '../data/palomaData.js';
+import { tratamiento, categoryIdDeTransaccion } from '../services/finance/accountingMap.js';
 
 /**
  * ROAS = ventas atribuibles / inversión en marketing.
@@ -71,33 +72,39 @@ function anioMes(valor) {
 
 export function transaccionesAMeses(transacciones = []) {
   const porMes = new Map();
+  const nuevoMes = (key, m, mesIdx) => ({
+    key, nombre: `${NOMBRE_MES[mesIdx]} ${m[1]}`, corto: CORTO_MES[mesIdx],
+    ingresos: 0, cogsProd: 0, cogsEnvio: 0, cogsTrans: 0, empleados: 0, herramientas: 0, otros: 0,
+  });
   for (const t of transacciones) {
     const key = anioMes(t.fecha);
     if (!key) continue;
     const m = key.match(/^(\d{4})-(\d{2})/);
     const mesIdx = Number(m[2]) - 1;
-    if (!porMes.has(key)) {
-      porMes.set(key, { key, nombre: `${NOMBRE_MES[mesIdx]} ${m[1]}`, corto: CORTO_MES[mesIdx], ingresos: 0, gastos: 0 });
-    }
+    if (!porMes.has(key)) porMes.set(key, nuevoMes(key, m, mesIdx));
     const acc = porMes.get(key);
-    const monto = Number(t.monto) || 0;
-    if (monto >= 0) acc.ingresos += monto;
-    else acc.gastos += Math.abs(monto);
+    const monto = Number(t.monto ?? t.amount) || 0;
+    // ── Todo el ruteo contable se decide por categoryId vía ACCOUNTING_MAP ──
+    const tr = tratamiento(categoryIdDeTransaccion(t));
+    if (!tr.includeInPL) continue;                 // transfers/loans/owner: fuera del P&L
+    if (tr.bucket === 'ingresos') acc.ingresos += monto;          // con signo (reembolsos restan)
+    else if (tr.bucket) acc[tr.bucket] += Math.abs(monto);        // gastos como magnitud positiva
   }
 
   return [...porMes.values()]
     .sort((a, b) => a.key.localeCompare(b.key))
     .map((mm) => {
-      const gastosTotales = mm.gastos;
+      const cogs = mm.cogsProd + mm.cogsEnvio + mm.cogsTrans;
+      const gastosOperacionales = mm.empleados + mm.herramientas + mm.otros;
+      const gastosTotales = cogs + gastosOperacionales;
       const ebitda = mm.ingresos - gastosTotales;
       return {
         key: mm.key,
         nombre: mm.nombre,
         corto: mm.corto,
         ingresos: mm.ingresos,
-        cogs: 0, cogsProd: 0, cogsEnvio: 0, cogsTrans: 0,
-        gastosOperacionales: gastosTotales,
-        empleados: 0, herramientas: 0, otros: gastosTotales,
+        cogs, cogsProd: mm.cogsProd, cogsEnvio: mm.cogsEnvio, cogsTrans: mm.cogsTrans,
+        gastosOperacionales, empleados: mm.empleados, herramientas: mm.herramientas, otros: mm.otros,
         gastosTotales,
         ebitda,
         margen: mm.ingresos > 0 ? (ebitda / mm.ingresos) * 100 : 0,

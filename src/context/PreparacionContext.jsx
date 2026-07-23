@@ -2,6 +2,13 @@ import { createContext, useContext, useEffect, useMemo, useState, useCallback } 
 import { perfilVacio } from '../data/profileSchema.js';
 import { persistence } from '../services/persistence/index.js';
 import { clavePorDescripcion } from '../services/finance/categorizer.js';
+import {
+  aprobar as aprobarDominio,
+  editarCategoria as editarCategoriaDominio,
+  eliminarImportacion as eliminarImportacionDominio,
+  eliminarTransaccion as eliminarTransaccionDominio,
+  backfillLegacy,
+} from '../services/finance/importSessions.js';
 
 /**
  * Estado global del emprendedor. El Startup Profile es la única fuente de verdad;
@@ -33,6 +40,8 @@ const ESTADO_INICIAL = {
   invitaciones: [],
   // Preferencias
   notificacionesActivas: false,
+  // Preferencias por categoría de notificación (todas activas por defecto).
+  notifCategorias: { importacion: true, revision: true, diagnostico: true, anomalia: true, error: true, mentor: true },
   // Fuente de datos financieros: null | 'fintoc' | 'manual' | 'demo'
   fuenteFinanciera: null,
   // Datos financieros reales importados (CSV/Excel/Fintoc).
@@ -45,6 +54,8 @@ const ESTADO_INICIAL = {
   diagnostico: null,
   // Historial de importaciones para detectar duplicados a futuro.
   importHistory: [],
+  // Sesiones de importación (drafts→approved) con provenance y summary (M2).
+  importSessions: [],
   copilotoActivado: false,
   umbralMentor: 70,
   // Preferencias de experiencia
@@ -56,6 +67,25 @@ const ESTADO_INICIAL = {
 
 function clamp(n, lo, hi) {
   return Math.max(lo, Math.min(hi, n));
+}
+
+/**
+ * Aplana el diagnóstico para que sea seguro en Firestore (sin arrays anidados).
+ * Convierte topCategoria [cat, monto] → {categoria, monto} y catOrden
+ * [[cat,monto],…] → [{categoria, monto},…]. El banner solo usa texto/fecha, así
+ * que no perdemos nada visible y evitamos que setDoc rechace el documento.
+ */
+function sanitizarDiagnostico(diag) {
+  if (!diag) return null;
+  const s = diag.stats || null;
+  const par = (p) => (Array.isArray(p) ? { categoria: p[0], monto: p[1] } : (p || null));
+  const stats = s ? {
+    total: s.total, ingresos: s.ingresos, egresos: s.egresos, neto: s.neto,
+    marketingPct: s.marketingPct, suscripciones: s.suscripciones, revisar: s.revisar,
+    topCategoria: par(s.topCategoria),
+    categorias: Array.isArray(s.catOrden) ? s.catOrden.map(par) : [],
+  } : null;
+  return { texto: diag.texto || '', fecha: diag.fecha || new Date().toISOString(), stats };
 }
 
 function pctLlenos(keys, perfil) {
@@ -242,9 +272,6 @@ export function PreparacionProvider({ children }) {
       const clave = (t) => `${t.fecha}|${t.monto}|${(t.descripcion || '').slice(0, 40)}`;
       const existentes = new Set(prev.transacciones.map(clave));
       const agregadas = nuevas.map(norm).filter((t) => !existentes.has(clave(t)));
-      const total = prev.transacciones.length + agregadas.length;
-      // [OB-diag] temporal: recibidas vs agregadas vs total almacenado.
-      console.info('[OB-diag] importarTransacciones — recibidas:', nuevas.length, '· nuevas:', agregadas.length, '· total almacenado:', total);
       return {
         ...prev,
         transacciones: [...prev.transacciones, ...agregadas],
@@ -253,6 +280,56 @@ export function PreparacionProvider({ children }) {
         fintoc: meta.fintoc ? { ...prev.fintoc, ...meta.fintoc } : prev.fintoc,
       };
     });
+  }, []);
+
+  /**
+   * M2 — APRUEBA una importación (draft → committed). Crea una ImportSession con
+   * summary, estampa provenance + `original` en cada transacción y las agrega al
+   * estado. Deduplica contra lo ya almacenado (misma clave que importarTransacciones).
+   * @returns {string} importId de la sesión creada.
+   */
+  const aprobarImportacion = useCallback((movimientos = [], meta = {}) => {
+    const { session, transacciones } = aprobarDominio({
+      transacciones: movimientos,
+      filename: meta.filename || 'Importación',
+      source: meta.fuente || 'manual',
+      institution: meta.institution || null,
+      account: meta.account || null,
+      period: meta.period || null,
+      fileType: meta.fileType || null,
+      docHash: meta.docHash || null,
+      counts: meta.counts || null,
+    });
+    setEstado((prev) => {
+      const clave = (t) => `${t.fecha}|${t.monto}|${(t.descripcion || '').slice(0, 40)}`;
+      const existentes = new Set(prev.transacciones.map(clave));
+      const agregadas = transacciones.filter((t) => !existentes.has(clave(t)));
+      return {
+        ...prev,
+        transacciones: [...prev.transacciones, ...agregadas],
+        importSessions: [session, ...(prev.importSessions || [])],
+        fuenteFinanciera: meta.fuente || prev.fuenteFinanciera || 'manual',
+      };
+    });
+    return session.importId;
+  }, []);
+
+  /** M2 — Edita la categoría de UNA transacción, preservando su `original`. */
+  const editarCategoriaTransaccion = useCallback((txId, categoryId) => {
+    setEstado((prev) => ({
+      ...prev,
+      transacciones: prev.transacciones.map((t) => (t.id === txId ? editarCategoriaDominio(t, categoryId) : t)),
+    }));
+  }, []);
+
+  /** M2 — Borra UNA transacción y recalcula el summary de su sesión. */
+  const eliminarTransaccion = useCallback((txId) => {
+    setEstado((prev) => eliminarTransaccionDominio(prev, txId));
+  }, []);
+
+  /** M2 — Borra una importación completa (sus transacciones + su sesión). */
+  const eliminarImportacion = useCallback((importId) => {
+    setEstado((prev) => eliminarImportacionDominio(prev, importId));
   }, []);
 
   const setFintoc = useCallback((patch) => {
@@ -277,24 +354,27 @@ export function PreparacionProvider({ children }) {
    * se re-etiquetan todas las transacciones actuales que compartan esa clave.
    * La corrección del fundador es la fuente de verdad → confianza 100.
    */
-  const aprenderCategoria = useCallback((descripcion, categoria) => {
-    if (!descripcion || !categoria) return;
+  const aprenderCategoria = useCallback((descripcion, categoryId) => {
+    if (!descripcion || !categoryId) return;
     const clave = clavePorDescripcion(descripcion);
     if (!clave) return;
     setEstado((prev) => {
-      const categoryMappings = { ...(prev.categoryMappings || {}), [clave]: categoria };
-      const transacciones = prev.transacciones.map((t) =>
-        clavePorDescripcion(t.descripcion) === clave
-          ? { ...t, categoria, confianza: 100, source: 'fundador' }
-          : t,
-      );
+      // La memoria guarda el ID ESTABLE (M2). Se re-etiquetan las transacciones
+      // que compartan la clave preservando su `original` (dominio editarCategoria).
+      const categoryMappings = { ...(prev.categoryMappings || {}), [clave]: categoryId };
+      const transacciones = prev.transacciones.map((t) => (clavePorDescripcion(t.descripcion) === clave ? editarCategoriaDominio(t, categoryId) : t));
       return { ...prev, categoryMappings, transacciones };
     });
   }, []);
 
-  /** Guarda el último diagnóstico financiero generado por la IA. */
+  /** Guarda el último diagnóstico financiero generado por la IA.
+   *  IMPORTANTE: Firestore NO admite arrays anidados. `estadisticas()` devuelve
+   *  `catOrden` (array de pares [categoria, monto]) y `topCategoria` (un par),
+   *  que son arrays anidados. Si se guardan tal cual, setDoc() rechaza TODO el
+   *  documento `estado` y las transacciones recién importadas nunca se persisten.
+   *  Aquí aplanamos esas estructuras a objetos antes de entrar al estado. */
   const setDiagnostico = useCallback((diag) => {
-    setEstado((prev) => ({ ...prev, diagnostico: diag || null }));
+    setEstado((prev) => ({ ...prev, diagnostico: sanitizarDiagnostico(diag) }));
   }, []);
 
   /** Registra una importación en el historial (para dedup futuro). Evita
@@ -345,6 +425,14 @@ export function PreparacionProvider({ children }) {
     setEstado((prev) => ({ ...prev, notificacionesActivas: activas }));
   }, []);
 
+  /** Activa/desactiva una categoría de notificación. */
+  const setNotifCategoria = useCallback((categoria, activa) => {
+    setEstado((prev) => ({
+      ...prev,
+      notifCategorias: { ...(prev.notifCategorias || {}), [categoria]: activa },
+    }));
+  }, []);
+
   const setVoiceMode = useCallback((v) => setEstado((prev) => ({ ...prev, voiceMode: v })), []);
   const setTourVisto = useCallback((v) => setEstado((prev) => ({ ...prev, tourVisto: v })), []);
   const setMentorAsignado = useCallback((mentor) => setEstado((prev) => ({ ...prev, mentorAsignado: mentor })), []);
@@ -374,9 +462,9 @@ export function PreparacionProvider({ children }) {
       merged.documentos = unir(prev.documentos, nuevo.documentos, (d) => d.id || `${d.nombre}|${d.tipo}`);
       // Si el local ya tiene fuente financiera y la nube no, conservar la local.
       merged.fuenteFinanciera = nuevo.fuenteFinanciera || prev.fuenteFinanciera || null;
-      // [OB-diag] temporal: local vs nube vs fusionado (no debe perder locales).
-      console.info('[OB-diag] hidratar — local:', prev.transacciones.length, '· nube:', (nuevo.transacciones || []).length, '· fusionado:', merged.transacciones.length);
-      return merged;
+      merged.importSessions = nuevo.importSessions || prev.importSessions || [];
+      // Backfill idempotente: asigna imp-legacy a transacciones previas sin importId.
+      return backfillLegacy(merged);
     });
   }, []);
 
@@ -403,6 +491,10 @@ export function PreparacionProvider({ children }) {
       alternarTarea,
       setFuenteFinanciera,
       importarTransacciones,
+      aprobarImportacion,
+      editarCategoriaTransaccion,
+      eliminarTransaccion,
+      eliminarImportacion,
       aprenderCategoria,
       setDiagnostico,
       registrarImportacion,
@@ -414,6 +506,7 @@ export function PreparacionProvider({ children }) {
       cancelarInvitacion,
       eliminarMiembro,
       setNotificaciones,
+      setNotifCategoria,
       setVoiceMode,
       setTourVisto,
       setMentorAsignado,
@@ -425,9 +518,9 @@ export function PreparacionProvider({ children }) {
       estado, dimensiones, nivel, mentorDesbloqueado, objetivos, gaps, bonusPreparacion,
       completarRecomendacion, completarDemoFinanciera, actualizarPerfil, setFundadora,
       subirDocumento, setEstadoDocumento, renombrarDocumento, eliminarDocumento,
-      alternarTarea, setFuenteFinanciera, importarTransacciones, aprenderCategoria, setDiagnostico, registrarImportacion, setFintoc, limpiarFinanzas,
+      alternarTarea, setFuenteFinanciera, importarTransacciones, aprobarImportacion, editarCategoriaTransaccion, eliminarTransaccion, eliminarImportacion, aprenderCategoria, setDiagnostico, registrarImportacion, setFintoc, limpiarFinanzas,
       agregarLogro, asegurarOwner, invitarMiembro,
-      cancelarInvitacion, eliminarMiembro, setNotificaciones, setVoiceMode, setTourVisto,
+      cancelarInvitacion, eliminarMiembro, setNotificaciones, setNotifCategoria, setVoiceMode, setTourVisto,
       setMentorAsignado, hidratar, reiniciar,
     ]
   );

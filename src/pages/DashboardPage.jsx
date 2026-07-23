@@ -5,6 +5,8 @@ import Dashboard from '../components/Dashboard.jsx';
 import EstadoResultado from '../components/EstadoResultado.jsx';
 import FlujoCaja from '../components/FlujoCaja.jsx';
 import { getMesesDerivados, transaccionesAMeses, promedios, saldoActual as calcSaldoActual, runwayMeses, tendencia } from '../utils/calculations.js';
+import { analizarCobertura } from '../services/finance/coverage.js';
+import { computeInsights } from '../services/finance/insightEngine.js';
 import { SALDO_INICIAL } from '../data/palomaData.js';
 import { probarConexion } from '../api/client.js';
 import ConectarDatosModal from '../components/os/ConectarDatosModal.jsx';
@@ -26,12 +28,15 @@ export default function DashboardPage() {
     () => (esDemo ? getMesesDerivados() : transaccionesAMeses(transacciones)),
     [esDemo, transacciones]
   );
-  // [OB-diag] temporal: qué lee el Dashboard como fuente de verdad.
-  useEffect(() => {
-    console.info('[OB-diag] Dashboard — fuente:', fuenteFinanciera, '· transacciones:', transacciones.length, '· meses:', mesesDerivados.length);
-  }, [fuenteFinanciera, transacciones, mesesDerivados]);
   const saldoBase = esDemo ? SALDO_INICIAL : 0;
   const prom = useMemo(() => promedios(mesesDerivados), [mesesDerivados]);
+  // Motor de cobertura: confianza según meses consecutivos de historial (datos reales).
+  const cobertura = useMemo(
+    () => (esDemo ? null : analizarCobertura(transacciones)),
+    [esDemo, transacciones],
+  );
+  // Insights DETERMINISTAS (calculados por el InsightEngine sobre datos reales).
+  const insights = useMemo(() => (esDemo ? [] : computeInsights(transacciones)), [esDemo, transacciones]);
 
   const metrics = useMemo(() => {
     const saldo = calcSaldoActual(mesesDerivados, saldoBase);
@@ -132,6 +137,23 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {!esDemo && cobertura && !cobertura.suficiente && cobertura.meses > 0 && (
+          <div className="overflow-hidden rounded-2xl border border-amber-100 bg-amber-50/70 p-4 sm:p-5">
+            <div className="flex items-start gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-400 text-white text-lg">📅</span>
+              <div>
+                <p className="flex items-center gap-2 font-extrabold text-slate-900">
+                  Historial financiero incompleto
+                  <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
+                    Confianza {cobertura.nivelConfianza}
+                  </span>
+                </p>
+                <p className="mt-1 text-sm text-slate-600">{cobertura.mensaje}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {!esDemo && diagnostico?.texto && (
           <div className="overflow-hidden rounded-2xl border border-brand-100 bg-gradient-to-r from-brand-50/60 to-white p-4 sm:p-5">
             <div className="flex items-start gap-3">
@@ -148,6 +170,29 @@ export default function DashboardPage() {
                 <p className="mt-1 text-sm text-slate-600">{diagnostico.texto}</p>
               </div>
             </div>
+          </div>
+        )}
+
+        {!esDemo && insights.length > 0 && (
+          <div>
+            <p className="mb-2 text-sm font-bold text-slate-700">Insights</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {insights.slice(0, 4).map((ins) => {
+                const estilo = ins.severity === 'critical'
+                  ? 'border-rose-200 bg-rose-50/60'
+                  : ins.severity === 'warning'
+                    ? 'border-amber-200 bg-amber-50/60'
+                    : 'border-slate-200 bg-white';
+                const icono = ins.severity === 'critical' ? '🔴' : ins.severity === 'warning' ? '🟠' : '💡';
+                return (
+                  <div key={ins.id} className={`rounded-2xl border p-4 ${estilo}`}>
+                    <p className="flex items-center gap-2 text-sm font-bold text-slate-800"><span>{icono}</span>{ins.title}</p>
+                    <p className="mt-1 text-sm text-slate-600">{ins.explanation}</p>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-xs text-slate-400">Cifras calculadas por el motor contable; la IA solo las explica.</p>
           </div>
         )}
 

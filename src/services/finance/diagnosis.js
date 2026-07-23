@@ -3,8 +3,11 @@
  * Calcula estadísticas deterministas (siempre correctas) y arma una narrativa;
  * si hay IA disponible, la mejora. Nunca inventa datos ni da consejos genéricos.
  */
-import { getAIProvider } from '../ai/index.js';
 import { formatCLP } from '../../utils/formatters.js';
+import { tratamiento, categoryIdDeTransaccion } from './accountingMap.js';
+import { categoryName } from './categorize.js';
+import { computeInsights } from './insightEngine.js';
+import { narrarResumen } from './insightNarrator.js';
 
 function mesDe(fecha) {
   const m = String(fecha || '').match(/^(\d{4})-(\d{2})/);
@@ -26,16 +29,28 @@ function suscripcionesRecurrentes(movs) {
 }
 
 export function estadisticas(movimientos = []) {
-  const ingresos = movimientos.filter((m) => m.amount > 0).reduce((s, m) => s + m.amount, 0);
-  const egresos = movimientos.filter((m) => m.amount < 0).reduce((s, m) => s + Math.abs(m.amount), 0);
-  const porCat = {};
+  // Todas las estadísticas se rutean por categoryId vía ACCOUNTING_MAP. Los
+  // traspasos, préstamos y aportes (fuera del P&L) NO cuentan como ingreso ni
+  // gasto: nunca inflan el resultado. La agregación por categoría usa el ID
+  // estable y solo se traduce al nombre visible para mostrar.
+  let ingresos = 0; let egresos = 0; let marketing = 0;
+  const porCat = {}; // keyed por categoryId
   for (const m of movimientos) {
-    if (m.amount < 0) porCat[m.category] = (porCat[m.category] || 0) + Math.abs(m.amount);
+    const monto = Number(m.amount ?? m.monto) || 0;
+    const cid = categoryIdDeTransaccion(m);
+    const tr = tratamiento(cid);
+    if (!tr.includeInPL) continue;                       // excluye transfers/loans/owner
+    if (monto >= 0 && tr.includeInRevenue) { ingresos += monto; }
+    else if (monto < 0) {
+      egresos += Math.abs(monto);
+      porCat[cid] = (porCat[cid] || 0) + Math.abs(monto);
+      if (cid === 'marketing') marketing += Math.abs(monto);
+    }
   }
-  const catOrden = Object.entries(porCat).sort((a, b) => b[1] - a[1]);
+  // catOrden en pares [nombreVisible, monto] (compat con sanitizarDiagnostico).
+  const catOrden = Object.entries(porCat).sort((a, b) => b[1] - a[1]).map(([id, v]) => [categoryName(id), v]);
   const topCategoria = catOrden[0] || null;
-  const marketing = porCat.Marketing || 0;
-  const revisar = movimientos.filter((m) => m.confidence < 60).length;
+  const revisar = movimientos.filter((m) => (m.confidence ?? m.confianza ?? 100) < 60).length;
   return {
     total: movimientos.length,
     ingresos, egresos, neto: ingresos - egresos,
@@ -60,30 +75,18 @@ function narrativa(st) {
 }
 
 /**
- * Genera el diagnóstico. Devuelve { texto, stats }.
- * @param {Array} movimientos  modelo normalizado (con amount, category, confidence)
+ * Genera el diagnóstico. Ahora está IMPULSADO POR EL INSIGHT ENGINE:
+ * los hechos se calculan de forma determinista (computeInsights) y la IA solo
+ * REESCRIBE la narrativa (narrarResumen). La IA nunca produce cifras.
+ * Devuelve { texto, stats, insights } — `stats` se conserva por compatibilidad.
+ * @param {Array} movimientos  transacciones (con amount/categoryId/confidence)
  * @param {object} opts { negocio }
  */
-export async function generarDiagnostico(movimientos = [], { negocio } = {}) {
+export async function generarDiagnostico(movimientos = [], { negocio } = {}) { // eslint-disable-line no-unused-vars
   const stats = estadisticas(movimientos);
+  const insights = computeInsights(movimientos);
   const base = narrativa(stats);
-
-  // Mejora opcional con IA (mismos números; solo redacción más cercana).
-  try {
-    const ai = getAIProvider();
-    const resumen = {
-      transacciones: stats.total, ingresos: stats.ingresos, gastos: stats.egresos,
-      neto: stats.neto, topGasto: stats.topCategoria, marketingPct: stats.marketingPct,
-      suscripciones: stats.suscripciones, porRevisar: stats.revisar,
-      negocio: negocio?.modelo || null,
-    };
-    const j = await ai.json(
-      `Eres el Copiloto Financiero de Open Beauchef (español chileno, cálido, concreto). ` +
-      `Con estos datos REALES, escribe un diagnóstico de 3-5 frases. No inventes cifras ni des consejos genéricos. ` +
-      `Devuelve SOLO JSON {"texto":"..."}.\n${JSON.stringify(resumen)}`
-    );
-    if (j && typeof j.texto === 'string' && j.texto.length > 30) return { texto: j.texto, stats };
-  } catch { /* usa narrativa base */ }
-
-  return { texto: base, stats };
+  // La IA solo pule; si falla, queda la narrativa determinista (o los insights).
+  const texto = insights.length ? await narrarResumen(insights) : base;
+  return { texto: texto || base, stats, insights };
 }

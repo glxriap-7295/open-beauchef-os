@@ -92,14 +92,11 @@ export const fintocProvider = {
     if (!liRes.ok || !liData.widget_token) {
       throw new Error(liData.error || 'No se pudo iniciar la conexión con Fintoc.');
     }
-    console.info('[OB-diag Fintoc] 1/5 widget_token recibido:', Boolean(liData.widget_token));
 
     // 2) Widget -> exchange_token
     const linkIntent = await this.abrirWidget(liData.widget_token);
-    console.info('[OB-diag Fintoc] 2/5 widget creado y conexión exitosa (onSuccess)');
     const exchangeToken = linkIntent?.exchangeToken || linkIntent?.exchange_token;
     if (!exchangeToken) throw new Error('Fintoc no devolvió un exchange_token.');
-    console.info('[OB-diag Fintoc] 3/5 exchange_token recibido:', Boolean(exchangeToken));
 
     // 3) Exchange -> link_token
     const exRes = await fetch(`${base}/exchange`, {
@@ -119,7 +116,6 @@ export const fintocProvider = {
       throw new Error(t.error || 'No se pudieron importar las cuentas.');
     }
     const { accounts = [] } = await accRes.json();
-    console.info('[OB-diag Fintoc] 4/5 cuentas encontradas:', accounts.length);
 
     // Sincronización incremental: recupera la última fecha guardada por link.
     const syncKey = `ob_fintoc_sync_${linkToken}`;
@@ -145,7 +141,6 @@ export const fintocProvider = {
 
     const ultimaSync = new Date().toISOString();
     try { localStorage.setItem(syncKey, JSON.stringify({ lastSync: ultimaSync.slice(0, 10), linkToken })); } catch { /* noop */ }
-    console.info('[OB-diag Fintoc] 5/5 movimientos importados:', movimientos.length);
 
     const banco = accounts[0]?.institution?.name || accounts[0]?.holder_name || 'Tu banco';
     return { banco, cuentas: accounts, movimientos, ultimaSync, linkToken };

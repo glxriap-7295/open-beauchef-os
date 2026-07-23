@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import AppLayout from '../components/os/AppLayout.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { usePreparacion } from '../context/PreparacionContext.jsx';
-import { notifications } from '../services/notifications/index.js';
+import { notifications, CATEGORIAS_NOTIF } from '../services/notifications/index.js';
 import { banking } from '../services/banking/index.js';
 import { getAIProvider } from '../services/ai/index.js';
 
@@ -188,7 +188,7 @@ function TabIntegraciones() {
 
 /* ── Notificaciones ── */
 function TabNotificaciones() {
-  const { notificacionesActivas, setNotificaciones, voiceMode, setVoiceMode, setTourVisto } = usePreparacion();
+  const { notificacionesActivas, setNotificaciones, voiceMode, setVoiceMode, setTourVisto, notifCategorias, setNotifCategoria } = usePreparacion();
   const [permiso, setPermiso] = useState(notifications.permiso());
   const soportaVoz = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
 
@@ -202,7 +202,7 @@ function TabNotificaciones() {
     }
   };
 
-  const eventos = ['Análisis completado', 'Alerta financiera', 'Nueva recomendación', 'IA terminó de analizar documentos', 'Sincronización de Fintoc completada'];
+  const cats = notifCategorias || {};
 
   return (
     <div className="max-w-lg space-y-5">
@@ -221,10 +221,20 @@ function TabNotificaciones() {
         </button>
       </div>
       <div>
-        <p className="mb-2 text-sm font-bold text-slate-800">Recibirás avisos de:</p>
+        <p className="mb-2 text-sm font-bold text-slate-800">Categorías de notificación</p>
         <ul className="space-y-1.5">
-          {eventos.map((e) => (
-            <li key={e} className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600"><span className="text-emerald-500">✓</span> {e}</li>
+          {Object.entries(CATEGORIAS_NOTIF).map(([clave, etiqueta]) => (
+            <li key={clave} className="flex items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600">
+              <span>{etiqueta}</span>
+              <button
+                onClick={() => setNotifCategoria(clave, cats[clave] === false)}
+                disabled={!notificacionesActivas}
+                className={`relative h-6 w-11 rounded-full transition ${cats[clave] !== false ? 'bg-emerald-500' : 'bg-slate-300'} disabled:opacity-50`}
+                aria-label={`Activar ${etiqueta}`}
+              >
+                <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${cats[clave] !== false ? 'left-6' : 'left-1'}`} />
+              </button>
+            </li>
           ))}
         </ul>
       </div>

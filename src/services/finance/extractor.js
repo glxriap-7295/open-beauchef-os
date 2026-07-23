@@ -120,16 +120,86 @@ function filasDesdeTexto(texto) {
     .filter((f) => f.length >= 2);
 }
 
-async function textoDesdePDF(bytes, doc) {
-  let texto = '';
-  for (let p = 1; p <= doc.numPages; p += 1) {
-    // eslint-disable-next-line no-await-in-loop
-    const page = await doc.getPage(p);
-    // eslint-disable-next-line no-await-in-loop
-    const content = await page.getTextContent();
-    texto += content.items.map((it) => it.str).join(' ') + '\n';
+// ── Reconstrucción tabular de PDFs por POSICIÓN ────────────────────
+// pdf.js entrega ítems de texto con coordenadas; si sólo los unimos con
+// espacios, TODA la página queda en una sola "línea" y no hay filas por
+// transacción (bug: el importador recibía 1 fila que se consumía como
+// encabezado → 0 movimientos). Aquí agrupamos ítems en líneas por su Y y en
+// columnas por su X, usando el encabezado como anclas de columna.
+
+// Mapea una palabra del encabezado a su columna canónica.
+function bucketColumna(t) {
+  const s = String(t).toLowerCase();
+  if (/fecha|date/.test(s)) return 'Fecha';
+  if (/detalle|movimiento|glosa|descrip|concepto/.test(s)) return 'Detalle';
+  if (/cargo|d[eé]bito|debe|giro/.test(s)) return 'Cargo';
+  if (/abono|cr[eé]dito|haber|dep[oó]sito/.test(s)) return 'Abono';
+  if (/monto|importe|valor|amount/.test(s)) return 'Monto';
+  if (/saldo|balance/.test(s)) return 'Saldo';
+  return null;
+}
+
+// Agrupa los ítems de UNA página en líneas (por Y) y las ordena de arriba a
+// abajo; dentro de cada línea, ordena por X.
+function agruparLineas(items) {
+  const its = (items || [])
+    .filter((it) => typeof it.str === 'string' && it.str.trim() !== '')
+    .map((it) => ({ str: it.str.trim(), x: it.transform[4], y: it.transform[5], h: it.height || 10 }));
+  const lineas = [];
+  for (const it of its) {
+    let L = lineas.find((l) => Math.abs(l.y - it.y) <= Math.max(2, it.h * 0.5));
+    if (!L) { L = { y: it.y, items: [] }; lineas.push(L); }
+    L.items.push(it);
   }
-  return texto;
+  lineas.sort((a, b) => b.y - a.y);            // PDF: Y crece hacia arriba
+  for (const L of lineas) L.items.sort((a, b) => a.x - b.x);
+  return lineas;
+}
+
+// Reconstruye una tabla a partir de las líneas de cada página. Detecta la fila
+// de encabezado (≥2 columnas reconocidas + una de monto), fija las anclas de
+// columna por X y asigna cada token de las filas siguientes a su columna por
+// rango. Descarta líneas de título/metadata previas al encabezado.
+// Devuelve una matriz de filas (encabezado incluido) o null si no hay tabla.
+function reconstruirTablaPDF(paginas) {
+  let labels = null;
+  let xs = null;
+  const filas = [];
+
+  const aFila = (L) => {
+    const cells = labels.map(() => '');
+    for (const it of L.items) {
+      let j = 0;
+      for (let k = 0; k < xs.length; k += 1) if (it.x >= xs[k] - 3) j = k;
+      cells[j] = (cells[j] ? `${cells[j]} ${it.str}` : it.str).trim();
+    }
+    return cells;
+  };
+
+  for (const lineas of paginas) {
+    let hidx = -1;
+    for (let i = 0; i < lineas.length; i += 1) {
+      const bs = lineas[i].items.map((it) => bucketColumna(it.str)).filter(Boolean);
+      const set = new Set(bs);
+      if (set.size >= 2 && (set.has('Cargo') || set.has('Abono') || set.has('Monto') || set.has('Saldo'))) { hidx = i; break; }
+    }
+    if (hidx !== -1) {
+      const cols = new Map();
+      for (const it of lineas[hidx].items) {
+        const b = bucketColumna(it.str);
+        if (b && (!cols.has(b) || it.x < cols.get(b))) cols.set(b, it.x);
+      }
+      const ordenadas = [...cols.entries()].sort((a, b) => a[1] - b[1]);
+      labels = ordenadas.map((e) => e[0]);
+      xs = ordenadas.map((e) => e[1]);
+      if (!filas.length) filas.push(labels);
+      for (const L of lineas.slice(hidx + 1)) filas.push(aFila(L));
+    } else if (labels) {
+      // Página sin su propio encabezado: reutiliza las anclas anteriores.
+      for (const L of lineas) filas.push(aFila(L));
+    }
+  }
+  return labels ? filas : null;
 }
 
 // Renderiza cada página del PDF a canvas y aplica OCR (Tesseract, español).
@@ -177,8 +247,22 @@ export async function extraerArchivo(file, { onPaso, ocr = true } = {}) {
     const pdfjs = await cargarPDF();
     const doc = await pdfjs.getDocument({ data: buf }).promise;
     let texto = '';
-    try { texto = await textoDesdePDF(buf, doc); } catch { texto = ''; }
-    let filas = filasDesdeTexto(texto);
+    const paginas = [];
+    try {
+      for (let p = 1; p <= doc.numPages; p += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        const page = await doc.getPage(p);
+        // eslint-disable-next-line no-await-in-loop
+        const content = await page.getTextContent();
+        const lineas = agruparLineas(content.items);
+        paginas.push(lineas);
+        // Texto plano (una línea por fila visual) para detectar el banco.
+        texto += lineas.map((L) => L.items.map((it) => it.str).join(' ')).join('\n') + '\n';
+      }
+    } catch { texto = ''; }
+    // Reconstrucción tabular por posición; si no hay tabla reconocible, fallback
+    // al parser por espacios sobre el texto plano (ya con saltos de línea reales).
+    let filas = reconstruirTablaPDF(paginas) || filasDesdeTexto(texto);
     // PDF sin texto extraíble => escaneado. Intentamos OCR (mejor esfuerzo).
     if (!filas.length && ocr) {
       try {
